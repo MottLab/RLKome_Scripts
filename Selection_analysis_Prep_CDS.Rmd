@@ -1,0 +1,81 @@
+---
+title: "Prepare_CDS_for_Selection"
+output: html_document
+date: "2024-04-23"
+---
+
+###this chunk will take as input a folder where a bunch of CDS are and gets them ready for selection
+```{r}
+library(phylotools)
+library(stringr)
+library(dplyr)
+
+
+directory="D:/Analysis_Output/hyphy/CDS/Dec_stuff/"
+fasta_list=list.files(directory ,pattern="*.fasta$")
+output_dir="D:/Analysis_Output/hyphy/CDS/Dec_stuff/"
+
+#loops over each, checking for certain feature issues
+for (i in 1:length(fasta_list)){
+  
+   if (file.size(paste(directory,fasta_list[i], sep=""))[1] > 0){
+     
+  print(fasta_list[i])
+  
+  fastas=read.fasta(paste(directory,fasta_list[i],sep=""))
+  
+ 
+  #loop over sequences in file
+  for (j in 1:nrow(fastas)){
+     
+      #fix start codon if it doesn't start with ATG
+        start_codon = gregexpr("atg", fastas[j,2], ignore.case=TRUE)[[1]][1]
+        
+        fastas[j,2] = str_sub(fastas[j,2],start_codon, -1)
+        
+          #get last codon 
+      
+            last_codon=toupper(str_sub(fastas[j,2],nchar(fastas[j,2])-2, nchar(fastas[j,2])))
+         
+           
+           if (last_codon == "TGA" | last_codon == "TAA" | last_codon == "TAG"){
+             
+             fastas[j,2] = str_sub(fastas[j,2],1, -4)
+             
+           }
+           
+    
+          if (nchar(fastas[j,2])%%3==1){
+          
+            
+            fastas[j,2] = str_sub(fastas[j,2],1, -2)
+            
+            
+          }else if (nchar(fastas[j,2])%%3==2){
+            
+            fastas[j,2] = str_sub(fastas[j,2],1, -3)
+            
+          }
+        
+        
+       
+       
+          
+  }
+  
+  
+  fastas$seq.name=paste(">",fastas$seq.name,sep="")
+  
+  write.table(fastas, paste(output_dir,fasta_list[i],"_fixed_seqs.cds",sep=""), quote=FALSE, row.names = FALSE, col.names=FALSE, sep="\n")
+  
+  
+  
+   }else{
+  
+  warning(paste("Input file ", fasta_list[i], "is empty.", sep=""))
+     
+  }
+
+} 
+
+```

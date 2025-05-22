@@ -1,0 +1,708 @@
+---
+title: "Plots_Dump"
+author: "Zachary Kileeg"
+date: "3/11/2021"
+output: html_document
+---
+
+```{r, fig.width=30, fig.height=30}
+
+
+csv_in = as.matrix(read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/Mar11_Species_LRR_Count_Percentages_of_Total_Proteins.csv", row.names=1))
+
+
+
+test_heatmap = heatmap(csv_in, name="scale", col=heat.colors(256), cexRow=0.9, cexCol=2, scale="column", margins=c(5,50)) + 
+    legend(x="bottomright", legend=c("min, "))
+
+
+
+
+```
+
+
+```{r}
+
+library(ggplot2)
+library(ggtree)
+library(treeio)
+library(tidytree)
+
+tree = read.tree(file="D:/Sequence_Data/Phylogenetics_Project/Trees/NCBI_Species_Trees/2021_July20_NCBI_113Species_Tree.nwk")
+
+input_matrix = read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/Predict_PhytoLRR/2021_July22_FamI.1_XII.1_Comparison.csv")
+
+tree_plot=ggtree(tree) + geom_tiplab(size=2, align=TRUE, linsize=0.5) + theme_tree2()
+
+gheatmap(tree_plot, input_matrix, offset=8, width=0.6, colnames=FALSE, legend_title="Thing")
+
+
+```
+
+
+
+##meant for boxplots for anything
+
+```{r}
+
+library(ggplot2)
+library(tidyr)
+library(ggpubr)
+library(dplyr)
+
+
+csv_in = read.csv("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/NLrs_RLKs_counts_for_graphing.csv")
+
+#average = mean(csv_in$RLKs)
+
+average_vector = sapply(csv_in[,2:ncol(csv_in)], mean)
+csv_in = rbind(csv_in, c("Average", average_vector))
+
+standarderror = function(x){sd(x)/sqrt(length(x))}
+stderr_vector = sapply(csv_in[,2:ncol(csv_in)],standarderror)
+
+
+nlr_rlk_df = csv_in[,1:3]
+
+plot_df = gather(csv_in, key = "Family", value="Gene Count", -X) 
+
+plot_df = gather(csv_in[], key = "Family", value="Gene Count", -X, -RLKs, -NLRs)
+plot_df = plot_df[,-2]
+
+
+plot_df = gather(nlr_rlk_df[nrow(csv_in),], key = "Family", value="Gene Count", -X) 
+
+
+
+
+plot_df$Family = factor(plot_df$Family, levels = c("C_LEC", "CR4L","CRK","CrRLK1L", "Extensin", "LecRLK", "LRK", "LRK10L", "LRR", "MLRR", "PR5L", "PERKL","RKF3L", "RLCK", "SRK", "URK", "WAKL", "RLKs", "NLRs"))
+  
+ggplot(data=plot_df, aes(x=Family, y=as.numeric(`Gene Count`), fill=Family))  + 
+         geom_bar(stat="summary") + 
+         geom_errorbar(stat="summary") + 
+         scale_fill_manual(values=c("cyan","#d563ba", "#73b638", "#9f58c0","#5fb96d","#d33d72","#48b6a5","#d84e37","#676bcf","#b5ad45","#7191cf","#de9039","#9a4c73","#5b7c39","#df859c","#a87c42", "#b85944", "darkblue", "darkgreen"))    +  theme_classic()
+
+ggviolin(data=plot_df, x="Family", y="Gene Count", width=1, draw.quantiles=TRUE, add="jitter", add.params=list(size=0.1, color="Family")) + 
+  scale_color_manual(values=c("cyan", "#d563ba", "#73b638", "#9f58c0","#5fb96d","#d33d72","#48b6a5","#d84e37","#676bcf","#b5ad45","#7191cf","#de9039","#9a4c73","#5b7c39","#df859c","#a87c42", "#b85944", "darkblue", "darkgreen"))
+
+ggsave(paste("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/Figures/Bars_RLKs_withouttotals_counts.png", sep=""),height=10, width=15, dpi=600)
+  
+  
+```
+
+```{r}
+
+library(ggplot2)
+library(tidyr)
+library(ggpubr)
+library(dplyr)
+
+
+counts_in = read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/Predict_PhytoLRR/2022_May25_LRRCounts_Species_OrderLabelled.csv", header=TRUE)
+
+counts_in = read.csv()
+#counts_in = read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/Predict_PhytoLRR/2022_June1_LRRCounts_SplitByOrder_AncestralStateNormalized.csv", header=TRUE)
+
+#colnames(counts_in) = c("Species", "VIII.2","II","IX","I.1","VIII.1","XII","XI.1a","Xb.2","Xa","Xb.1a","VII.2a","Xb.1","XI.1b","XIII.b","XI.1c","XV","XIII.a","VII.3","VII.1","III","IV","XIV","VI.1","V","VI.2","V","VI.2","Total","Order")
+
+counts_I_XII = counts_in[,c("Species", "I.1", "XII", "Order")]
+
+counts_multiple = counts_in[,c("Species", "I.1", "III", "VIII.1", "VIII.2", "XI.1b", "XI.1c.", "XII", "Order")]
+
+counts_I = counts_in[,c("Species", "I.1", "Order")]
+
+
+#first thing we need to do is normalize the counts by the total number of LRRs in each species
+counts_I_XII$I.1 = counts_I_XII$I.1 / counts_in$Total
+counts_I_XII$XII = counts_I_XII$XII / counts_in$Total
+
+counts_multiple$I.1 = counts_multiple$I.1 / counts_in$Total
+counts_multiple$III = counts_multiple$III / counts_in$Total
+counts_multiple$VIII.1 = counts_multiple$VIII.1 / counts_in$Total
+counts_multiple$VIII.2 = counts_multiple$VIII.2 / counts_in$Total
+counts_multiple$XI.1b = counts_multiple$XI.1b / counts_in$Total
+counts_multiple$XI.1c. = counts_multiple$XI.1c. / counts_in$Total
+counts_multiple$XII = counts_multiple$XII / counts_in$Total
+
+
+#Normalize to ancestral counts if wanted
+#counts_I_XII$I.1 = counts_I_XII$I.1 / 19
+counts_I_XII$I.1 = counts_I_XII$I.1 / 14
+
+#counts_I_XII$XII = counts_I_XII$XII / 10
+
+counts_I_XII$XII = counts_I_XII$XII / 27
+
+#normalize byrophytes separately as they have a different ancestor
+
+counts_I_XII[counts_I_XII$Order =="Bryophytes", 2] = counts_I_XII[counts_I_XII$Order =="Bryophytes", 2] * 14 / 19
+counts_I_XII[counts_I_XII$Order =="Bryophytes", 3] = counts_I_XII[counts_I_XII$Order =="Bryophytes", 3] * 27 / 10
+
+
+counts_I_XII$Ratio = counts_I_XII$I.1/counts_I_XII$XII
+
+counts_I_XII_filtered = counts_I_XII %>% filter(Order != "Chlorophyta" & Species != "Pumbi")
+
+counts_multiple_filtered = counts_multiple %>% filter(Order != "Chlorophyta" & Species != "Pumbi")
+
+
+
+colour_for_lines = matrix(nrow=nrow(counts_I_XII_filtered), ncol=1)
+
+#add column with line colours for paired lines. This one is for absolute values
+for (i in 1:nrow(counts_I_XII_filtered)){
+  
+  temp_diff = counts_I_XII_filtered[i,2] - counts_I_XII_filtered[i,3]
+  
+  if (temp_diff > 1){
+    colour_for_lines[i,1] = "Up"
+  } else if(temp_diff < -1){
+    colour_for_lines[i,1] = "Down"
+  } else {
+    colour_for_lines[i,1] = "Equal"
+  }
+}
+
+#this one is for normalized values
+for (i in 1:nrow(counts_I_XII_filtered)){
+  
+  temp_diff = counts_I_XII_filtered[i,2] - counts_I_XII_filtered[i,3]
+  
+  if (temp_diff > 0.1){
+    colour_for_lines[i,1] = "Up"
+  } else if(temp_diff < -0.1){
+    colour_for_lines[i,1] = "Down"
+  } else {
+    colour_for_lines[i,1] = "Equal"
+  }
+}
+
+
+colnames(colour_for_lines) = "Line_Colour"
+counts_I_XII_filtered = cbind(counts_I_XII_filtered, as.data.frame(colour_for_lines))
+
+#Run first df_to_graph if graphing a different plot type without line colours
+#df_to_graph = gather(counts_I_XII, key="LRR_Family", value="Count", -1,-4)
+
+
+#gather one lineage to plot 
+
+
+df_to_graph = gather(counts_specific, key="LRR_Family", value="Count", -1,-4,-5)
+
+
+#gather two to plot
+df_to_graph = gather(counts_I_XII_filtered, key="LRR_Family", value="Count", -1,-4,-5)
+
+#gather multple to plot
+df_to_graph = gather(counts_multiple_filtered, key="LRR_Family", value="Count", -1, -9)
+
+colnames(average_order_count) = c("Order", "I.1", "XII")
+average_order_count[,1] = sort(unique(counts_I_XII_filtered$Order))
+
+for(order_name in unique(counts_I_XII_filtered$Order)){
+  
+  
+  temp_filtered = counts_I_XII_filtered %>% filter(Order %in% order_name)
+  
+  average_order_count[average_order_count[,1]==order_name,2] = mean(temp_filtered$I.1)
+  average_order_count[average_order_count[,1]==order_name,3] = mean(temp_filtered$XII)
+  
+  
+}
+
+#change value counts into a percentage of the total number
+average_order_count[,2] = as.numeric(average_order_count[,2])/sum(as.numeric(average_order_count[,2])) * 100
+average_order_count[,3] = as.numeric(average_order_count[,3])/sum(as.numeric(average_order_count[,3])) * 100
+
+average_df_to_plot = gather(data=as.data.frame(average_order_count), key="LRR_Family", value="Count", -1)
+
+#change to numeric values
+average_df_to_plot[average_df_to_plot$LRR_Family=="I.1",2] = 1
+average_df_to_plot[average_df_to_plot$LRR_Family=="XII",2] = 12
+#cbind colours to df_to_graph
+
+
+
+anova_test = aov(Count ~ Order, data=df_to_graph)
+tukey_test = TukeyHSD(anova_test, conf.level=0.95)
+
+order_list = unique(df_to_graph$Order)
+multi_tukeys = matrix(nrow=length(order_list), ncol=4)
+wilcox_tests = matrix(nrow=length(order_list), ncol=1)
+#do compare I to XII for each order
+
+row.names(multi_tukeys) = order_list
+colnames(multi_tukeys) = c("diff", "lwr", "upr", "p adj")
+
+row.names(wilcox_tests) = order_list
+colnames="pvalue"
+
+for (i in 1:length(order_list)){
+  
+  #temp_df = as.data.frame(df_to_graph[(df_to_graph[2,]==order_list[i]),])
+  
+  temp_anova = aov(Count~LRR_Family, data=df_to_graph[df_to_graph[,2]==order_list[i],])
+  
+  
+  multi_tukeys[i,] = unlist(TukeyHSD(temp_anova, conf.level=0.95))
+  
+  I_temp = df_to_graph[df_to_graph[,2]==order_list[i] & df_to_graph[,4]=="I.1",]
+  XII_temp = df_to_graph[df_to_graph[,2]==order_list[i] & df_to_graph[,4]=="XII",]
+  
+  wilcox_tests[i,1] = as.numeric(unlist(wilcox.test(Count~LRR_Family, df_to_graph[df_to_graph[,2]==order_list[i],], exact=FALSE, alternative="two.sided", paired=TRUE))[2])
+  
+  
+  
+}
+
+
+plot_order = c("Brassicales", "Bryophytes", "Caryophyllales", "Chlorophyta", "Fabales", "Malpighiales", "Malvales", "Poales", "Rosales", "Sapindales", "Other")
+plot_order = c("Brassicales", "Bryophytes", "Caryophyllales", "Fabales", "Malpighiales", "Malvales", "Poales", "Rosales", "Sapindales", "Other")
+order_groups = sort(rep(plot_order, 2))
+
+#plot single lineage boxplots
+ggplot(df_to_graph, aes(factor(x=Order, levels = plot_order), y=Count*100, fill=LRR_Family)) + geom_boxplot() + theme(plot.background=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank(), panel.border=element_rect(colour="black", fill=NA, size=1), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) + scale_fill_manual(values=c( "darkgreen", "lavender")) + xlab("Order") + ylab("Percentage of total LRR-RKs")
+
+#plot two lineage boxplots and compare
+ggplot(df_to_graph, aes(factor(x=Order, levels = plot_order), y=Count*100, fill=LRR_Family)) + geom_boxplot() + theme(plot.background=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank(), panel.border=element_rect(colour="black", fill=NA, size=1), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) + scale_fill_manual(values=c( "darkgreen", "lavender")) + xlab("Order") + ylab("Percentage of total LRR-RKs")
+
+#plot multiple at same time
+ggplot(df_to_graph, aes(factor(x=Order, levels = plot_order), y=Count*100, fill=LRR_Family)) + geom_boxplot() + theme(plot.background=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank(), panel.border=element_rect(colour="black", fill=NA, size=1), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) + scale_fill_manual(values=c("#a361c7", "#45b0a4", "#67a64e", "#c65c8a", "#b69340", "#6684cc","#cb5b42")) + xlab("Order") + ylab("Percentage of total LRR-RKs")
+
+ggboxplot(df_to_graph, x="Order", y="Count", fill="LRR_Family", point.size=0.1, outlier.size=0.1, xlab="Order", ylab="Normalized Count") + rotate_x_text(angle = 45) + stat_compare_means(label = "p.format", method = "t.test", paired=TRUE)    
+
+
+#Facet nested
+
+ggplot(df_to_graph, aes(x=LRR_Family, y=Count, fill=LRR_Family)) + geom_boxplot(outlier.size=0.1) + geom_point(aes(x=LRR_Family, y=Count, fill=LRR_Family), size=0.1) + geom_line(aes(x=LRR_Family, y=Count, group=Species), size=0.1) + facet_nested(~Order, scales="free") + stat_compare_means(label="p.format", paired=TRUE, method="t.test") +  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) + theme(plot.background=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank(), panel.border = element_rect(colour = "black", fill=NA, size=1), strip.background=element_blank())
+
+#facet wrap
+ggplot(df_to_graph, aes(x=LRR_Family, y=Count, fill=LRR_Family)) + geom_boxplot(outlier.size=0.1) + geom_point(aes(x=LRR_Family, y=Count, fill=LRR_Family), size=0.1) + geom_line(aes(group=Species, col=Line_Colour), size=0.1) + scale_colour_manual(values=c("red", "black", "green")) + facet_wrap(~Order, scales="free") + stat_compare_means(label="p.format", paired=TRUE, method="wilcox.test") +  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) + theme(plot.background=element_blank(), panel.grid.minor=element_blank(), panel.background=element_blank(), panel.border = element_rect(colour = "black", fill=NA, size=1), strip.background=element_blank())
+
+#Ancestor normalized
+ggpaired(df_to_graph, x="LRR_Family", y="Count", fill="LRR_Family", facet.by="Order", line.size = 0.1, point.size=0.1, outlier.size=0.1, xlab="Order", ylab="Count", scales="free") + stat_compare_means(label="p.format", paired=TRUE, method="t.test") 
+
+#raw counts
+ggpaired(df_to_graph, x="LRR_Family", y="Count", fill="LRR_Family", facet.by="Order", point.size=0.1, xlab="Order", ylab="Count") + stat_compare_means(label="p.format", paired=TRUE, label.y = 350, method="t.test")
+
+
+#plot proportion graph not percentage labels
+ggplot(average_df_to_plot, aes(x=LRR_Family, y=round(as.numeric(Count),digits=2), fill=Order, group=Order, colour=Order)) + geom_area(position="stack", alpha=1, size=0.5, colour="black") + geom_text(data=average_df_to_plot[average_df_to_plot$LRR_Family=="I.1",], aes(label = paste(format(round(as.numeric(Count),digits=2), nsmall=2), sep="")), position = position_stack(vjust=0.5), colour="black", size=2, check_overlap=TRUE, hjust=1.5) + geom_text(data=average_df_to_plot[average_df_to_plot$LRR_Family=="XII",], aes(label = paste(format(round(as.numeric(Count),digits=2), nsmall=2), sep="")), position = position_stack(vjust=0.5), colour="black", size=2, check_overlap=TRUE, hjust=-1) 
+
+
+#Proportion graph above with percentage labels
+ggplot(average_df_to_plot, aes(x=LRR_Family, y=round(as.numeric(Count),digits=2), fill=Order, group=Order, colour=Order)) + geom_area(position="stack", alpha=1, size=0.5, colour="black") + geom_text(data=average_df_to_plot[average_df_to_plot$LRR_Family=="I.1",], aes(label = paste(format(round(as.numeric(Count),digits=2), nsmall=2), "%", sep="")), position = position_stack(vjust=0.5), colour="black", size=2, check_overlap=TRUE, hjust=1.5) + geom_text(data=average_df_to_plot[average_df_to_plot$LRR_Family=="XII",], aes(label = paste(format(round(as.numeric(Count),digits=2), nsmall=2), "%", sep="")), position = position_stack(vjust=0.5), colour="black", size=2, check_overlap=TRUE, hjust=-1) 
+
+#Plot ratio
+p = ggplot(counts_I_XII_filtered, aes(factor(x=Order, levels = plot_order), y=Ratio)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))
+#plot ratio with sig
+p + stat_compare_means(label= "p.signif", method="t.test", ref.group=".all.")
+
+ggboxplot(counts_I_XII_filtered, x= "Order", y="Ratio") + stat_compare_means(method = "anova", label.y=40) + stat_compare_means(label= "p.signif", method="t.test", ref.group=".all.")
+
+#output graph
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/2023_Feb22_LRRI_vs_XII_Boxplots_Percentage.png",height=6, width=10, dpi=600)
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/2023_Sep12_MultipleLRRs_Boxplots_Percentage.png",height=6, width=20, dpi=600)
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/2022_June7_LRRCountsBy_Order_Facets.png",height=6, width=10, dpi=600)
+
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/2022_June10_LRRRatioToAncestorBy_Order_Facets_AlternateAncestor.png",height=6, width=10, dpi=600)
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/2022_June1_LRRRatioToAncestorBy_Order.png",height=6, width=10, dpi=600)
+
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/July7th_LRRI_XII_Orders_stacked_proportion.png",height=6, width=10, dpi=600)
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/Test.png",height=6, width=10, dpi=600)
+
+```
+
+
+
+
+###Proportion plots
+
+```{r}
+
+library(ggplot2)
+library(tidyr)
+library(ggpubr)
+library(dplyr)
+
+#get csv into memory
+order_counts_in = read.csv("D:/Sequence_Data/Phylogenetics_Project/Expansion_Reconciliation_Analysis/2022_July27_AncestralNumbers_LRRs_Poales.csv")
+
+#get percentage csv into memory
+order_counts_percentage = read.csv("D:/Sequence_Data/Phylogenetics_Project/Expansion_Reconciliation_Analysis/2022_July27_AncestralNumbers_LRRs_Poales_Percentages.csv")
+
+
+#filter them for wanted data
+order_counts_in_I.1 = order_counts_in[order_counts_in[,7] == "I.1",-6]
+#order_counts_in_XII = order_counts_in[order_counts_in[,7] == "XII",-6]
+order_counts_in_Brassicales = order_counts_in[-nrow(order_counts_in),]
+average_df_to_plot_Brassicales = gather(order_counts_in_Brassicales, Ancestor, Count, Embryophyta:Brassicales_Average, factor_key=TRUE)
+colnames(average_df_to_plot_Brassicales) = c("LRR_Family", "Ancestor", "Count")
+
+order_counts_in_Poales = order_counts_in[-nrow(order_counts_in),]
+average_df_to_plot_Poales = gather(order_counts_in_Poales, Ancestor, Count, Streptophyta:Poales_Average, factor_key=TRUE)
+colnames(average_df_to_plot_Poales) = c("LRR_Family", "Ancestor", "Count")
+
+#filter them for wanted data percentages
+#order_counts_in_I.1 = order_counts_percentage[order_counts_percentage[,6] == "I.1",]
+#order_counts_in_XII = order_counts_percentage[order_counts_percentage[,6] == "XII",]
+
+LRR_Family_Order = c("I.1", "II", "III", "IV", "V", "VI.1", "VI.2", "VII.1", "VII.2", "VII.3", "VIII.1", "VIII.2", "IX", "Xa", "Xb.1a", "Xb.1b", "Xb.2", "XI.1a", "XI.1b", "XI.1c", "XII", "XIIIa", "XIIIb", "XIV", "XV")
+
+#change from wide format to long format for ggplot
+#average_df_to_plot_I.1 = gather(order_counts_in_I.1, Ancestor, Count, X1st.Ancestor:Median.count.in.order, factor_key=TRUE)
+#average_df_to_plot_XII = gather(order_counts_in_XII, Ancestor, Count, X1st.Ancestor:Median.count.in.order, factor_key=TRUE)
+average_df_to_plot_Brassicales = gather(order_counts_percentage, Ancestor, Percentage, Embryophyta:Brassicales_Average, factor_key=TRUE)
+#average_df_to_plot_Brassicales = average_df_to_plot_Brassicales %>% slice(match(LRR_Family_Order, LRR_Family))
+colnames(average_df_to_plot_Brassicales) = c("LRR_Family", "Ancestor", "Percentage")
+
+average_df_to_plot_Poales = gather(order_counts_percentage, Ancestor, Percentage, Embryophyta:Poales_Average, factor_key=TRUE)
+colnames(average_df_to_plot_Poales) = c("LRR_Family", "Ancestor", "Percentage")
+
+
+colours_to_use = c("#aa5dcf", "#85b937","#6169d9","#52c05a","#d245a2","#4a8a34","#dd3a6b","#5fc08b","#d04e32","#45c7c8","#db9234","#6e73be",
+"#bfb33a","#ad65ad","#90882e","#67a0d9","#9d5e2b","#37967d","#9f4667","#327646","#df87b4","#9cb26a","#cd6867","#676b2a","#d99e6d")
+#plot proportion graph not percentage labels_family1
+#ggplot(average_df_to_plot_I.1, aes(x=Ancestor, y=Count, fill=Order, group=Order, color=Order)) + geom_area(aes(group = Order, fill=Order), position="stack", alpha=1, size=0.5, color="black") 
+
+#plot proportion graph not percentage labels_family12
+#ggplot(average_df_to_plot_XII, aes(x=Ancestor, y=Count, fill=Order, group=Order, color=Order)) + geom_area(position="stack", alpha=1, size=0.5, color="black")
+#plot percentages
+ggplot(average_df_to_plot_Brassicales, aes(x=Ancestor, y=Percentage, fill=factor(LRR_Family, levels=LRR_Family_Order), group=factor(LRR_Family, levels=LRR_Family_Order), color=factor(LRR_Family, levels=LRR_Family_Order))) + geom_area(aes(group = factor(LRR_Family, levels=LRR_Family_Order), fill=factor(LRR_Family, levels=LRR_Family_Order)), position="stack", alpha=1, size=0.5, color="black") + labs(fill = "LRR Subfamily") + scale_fill_manual(values = colours_to_use)
+
+ggplot(average_df_to_plot_Poales, aes(x=Ancestor, y=Percentage, fill=factor(LRR_Family, levels=LRR_Family_Order), group=factor(LRR_Family, levels=LRR_Family_Order), color=factor(LRR_Family, levels=LRR_Family_Order))) + geom_area(aes(group = factor(LRR_Family, levels=LRR_Family_Order), fill=factor(LRR_Family, levels=LRR_Family_Order)), position="stack", alpha=1, size=0.5, color="black") + labs(fill = "LRR Subfamily") + scale_fill_manual(values = colours_to_use)
+
+#Plot counts, not percentages as an area plot
+ggplot(average_df_to_plot_Brassicales, aes(x=Ancestor, y=Count, fill=LRR_Family, group=LRR_Family, color=LRR_Family)) + geom_area(aes(group = LRR_Family, fill=LRR_Family), position="stack", alpha=1, size=0.5, color="black") 
+
+ggplot(average_df_to_plot_Poales, aes(x=Ancestor, y=Count, fill=LRR_Family, group=LRR_Family, color=LRR_Family)) + geom_area(aes(group = LRR_Family, fill=LRR_Family), position="stack", alpha=1, size=0.5, color="black")
+
+
+
+#plot proportion graph not percentage labels
+ggplot(order_counts_in, aes(x=Ancestor, y=round(as.numeric(Count),digits=2), fill=Order, group=Order, colour=Order)) + geom_area(position="stack", alpha=1, size=0.5, colour="black") + geom_text(data=average_df_to_plot[average_df_to_plot$LRR_Family=="I.1",], aes(label = paste(format(round(as.numeric(Count),digits=2), nsmall=2), sep="")), position = position_stack(vjust=0.5), colour="black", size=2, check_overlap=TRUE, hjust=1.5) + geom_text(data=average_df_to_plot[average_df_to_plot$LRR_Family=="XII",], aes(label = paste(format(round(as.numeric(Count),digits=2), nsmall=2), sep="")), position = position_stack(vjust=0.5), colour="black", size=2, check_overlap=TRUE, hjust=-1) 
+
+
+#Proportion graph above with percentage labels
+ggplot(average_df_to_plot, aes(x=LRR_Family, y=round(as.numeric(Count),digits=2), fill=Order, group=Order, colour=Order)) + geom_area(position="stack", alpha=1, size=0.5, colour="black") + geom_text(data=average_df_to_plot[average_df_to_plot$LRR_Family=="I.1",], aes(label = paste(format(round(as.numeric(Count),digits=2), nsmall=2), "%", sep="")), position = position_stack(vjust=0.5), colour="black", size=2, check_overlap=TRUE, hjust=1.5) + geom_text(data=average_df_to_plot[average_df_to_plot$LRR_Family=="XII",], aes(label = paste(format(round(as.numeric(Count),digits=2), nsmall=2), "%", sep="")), position = position_stack(vjust=0.5), colour="black", size=2, check_overlap=TRUE, hjust=-1) 
+
+
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/2023_Feb17_Poales_LRRs_stacked_percentages_mean_alternatecolours.png",height=6, width=10, dpi=600)
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/Test.png",height=6, width=10, dpi=600)
+
+
+```
+
+
+
+
+
+##chunk is for heatmaps
+```{r}
+
+
+library(ggplot2)
+library(tidyr)
+
+
+data_in = read.csv("D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/Family_I.1/2022_May26_LRRI.1_CommonDomains.csv", header=TRUE)
+data_in = data_in[,-25]
+
+colnames(data_in) = gsub("\\.\\.", "\\.", colnames(data_in))
+
+subclade_count_in = read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/Predict_PhytoLRR/2022_May26_LRRI.1_Subclade_Counts.csv", header=TRUE, row.names=1)
+colnames(subclade_count_in) = gsub("\\.\\.", "\\.", colnames(subclade_count_in))
+
+#heatmap_matrix = sapply(data_in, as.numeric)
+#row.names(heatmap_matrix) = row.names(data_in)
+
+
+#heatmap(heatmap_matrix, Colv=NA, Rowv=NA, scale="column")
+
+heatmap_df_forggplot = gather(data_in, key="LRR_Family", value="Domain_number", -1)
+
+percentage_heatmap_df = data_in
+
+axis_order = colnames(percentage_heatmap_df[,2:ncol(percentage_heatmap_df)])
+#axis_order = gsub("\\.\\.", "\\.", axis_order)
+
+for (i in 2:ncol(percentage_heatmap_df)){
+  
+  for (j in 1:nrow(percentage_heatmap_df)){
+    
+    percentage_heatmap_df[j,i] = data_in[j,i] / subclade_count_in[1,(i-1)] * 100
+  }
+}
+
+ percentage_heatmap_df = gather(percentage_heatmap_df, key="LRR_Family", value="Domain_number", -1)
+
+#plot absolute values
+ggplot(heatmap_df_forggplot, aes(x=factor(LRR_Family,levels=axis_order), y=Domain, fill=Domain_number)) + geom_tile() + geom_text(aes(label=Domain_number), color="black", size=1.5) +  coord_fixed() + scale_fill_gradient2(low="white", high="blue") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))
+
+#plot percentages
+ggplot(percentage_heatmap_df, aes(x= factor(LRR_Family, levels=axis_order), y=Domain, fill=Domain_number)) + geom_tile() + coord_fixed() + scale_fill_gradient2(low="white", high="blue") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))
+
+#plot percentages
+ggplot(percentage_heatmap_df, aes(x=LRR_Family, y=Domain, fill=Domain_number)) + geom_tile() + coord_fixed() + scale_fill_gradient2(low="white", high="red") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5))
+
+
+
+#output graph
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/Family_I.1/2022_May26_CommonDomainsHeatmap_percentages_.png", height=6, width=10, dpi=600)
+
+
+
+```
+
+
+###plot simple boxplot comparison across orders for lrrI.1
+
+```{r}
+
+
+library(ggplot2)
+library(dplyr)
+library(ggpubr)
+
+counts_in = read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/Predict_PhytoLRR/2022_May25_LRRCounts_Species_OrderLabelled.csv", header=TRUE)
+
+lineage_to_examine = "XII"
+
+counts_lineage = counts_in[,c("Species", lineage_to_examine, "Order")]
+#counts_III = counts_in[,c("Species", "I.1", "Order")]
+#counts_VII1 = counts_in[,c("Species", "VIII.1", "Order")]
+
+#first, we need to normalize everything based on the total number of LRR-RKs in each species
+
+counts_lineage[,2] = counts_lineage[,2]/ counts_in$Total
+
+
+
+#Normalize to set counts. Normalize based on ancestory of embryophyta here for LRRI.1
+#counts_I$I.1 = counts_I$I.1 / 19
+
+#standardize based on ancestry
+#counts_I$I.1 = counts_I$I.1 - 19
+
+#counts_I_XII$XII = counts_I_XII$XII / 10
+
+#counts_I_XII$XII = counts_I_XII$XII / 27
+
+#normalize byrophytes separately as they have a different ancestor
+
+#counts_I_XII[counts_I_XII$Order =="Bryophytes", 2] = counts_I_XII[counts_I_XII$Order =="Bryophytes", 2] * 14 / 19
+#counts_I_XII[counts_I_XII$Order =="Bryophytes", 3] = counts_I_XII[counts_I_XII$Order =="Bryophytes", 3] * 27 / 10
+
+
+#counts_I_XII$Ratio = counts_I_XII$I.1/counts_I_XII$XII
+
+counts_lineage_filtered = counts_lineage %>% filter(Order != "Chlorophyta" & Species != "Pumbi")
+
+
+
+
+
+
+#colnames(colour_for_lines) = "Line_Colour"
+#counts_I_XII_filtered = cbind(counts_I_XII_filtered, as.data.frame(colour_for_lines))
+
+#Run first df_to_graph if graphing a different plot type without line colours
+df_to_graph = gather(counts_lineage_filtered, key="LRR_Family", value="Count", -1, -3)
+#df_to_graph = counts_lineage_filtered
+
+
+#average_order_count = matrix(nrow=length(unique(counts_I_XII_filtered$Order)), ncol=3)
+#rownames(average_order_count) = sort(unique(counts_I_XII_filtered$Order))
+
+#colnames(average_order_count) = c("Order", "I.1", "XII")
+#average_order_count[,1] = sort(unique(counts_I_XII_filtered$Order))
+
+
+
+#df_to_graph = counts_lineage_filtered
+#df_to_graph[,2] = df_to_graph[,3]*100
+  
+
+
+
+#anova_test = aov(I.1 ~ Order, data=df_to_graph)
+#tukey_test = TukeyHSD(anova_test, conf.level=0.95)
+
+#plot_order = c("Brassicales", "Bryophytes", "Caryophyllales", "Chlorophyta", "Fabales", "Malpighiales", "Malvales", "Poales", "Rosales", "Sapindales", "Other")
+plot_order = c("Brassicales", "Bryophytes", "Caryophyllales", "Fabales", "Malpighiales", "Malvales", "Poales", "Rosales", "Sapindales", "Other")
+order_groups = sort(rep(plot_order, 2))
+
+#ggplot(df_to_graph, aes(factor(x=Order, levels = plot_order), y=Count*100, fill=LRR_Family)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) + geom_point(aes(group=LRR_Family), size=0.1) + xlab("Order") + ylab("Percentage of total LRR-RLKs")+ geom_line()
+
+
+df_to_graph$Count = df_to_graph$Count*100
+
+#total count normalized
+ggboxplot(df_to_graph, x="Order", y="Count", order = plot_order, point.size=0.1, outlier.size=0.1, xlab="Order", ylab=paste("LRR-", lineage_to_examine, " percentage of total LRR-RLKs", sep="")) + rotate_x_text(angle = 45) + geom_hline(yintercept = mean(df_to_graph$Count), linetype = 2) + stat_compare_means(method="anova", label.x = 1.5, label.y = max(df_to_graph$Count+4)) + stat_compare_means(label = "p.signif", method = "t.test", ref.group = ".all.")    
+
+#ancestor_normalized
+#ggboxplot(df_to_graph, x="Order", y="I.1", point.size=0.1, outlier.size=0.1, xlab="Order", ylab="Normalized Count") + rotate_x_text(angle = 45) + geom_hline(yintercept = mean(df_to_graph$I.1), linetype = 2) + stat_compare_means(method="anova", label.y = 0.05, label.x = 1.5) + stat_compare_means(label = "p.signif", method = "t.test", ref.group = ".all.")
+
+
+
+
+ggsave(paste("D:/Sequence_Data/Phylogenetics_Project/Pictures/2023_Sep14_LRR-",lineage_to_examine,"_LRRCountTotalPercentage_globalmean_comparison_anova_ttest.png", sep=""),height=6, width=10, dpi=600)
+#ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/Test.png",height=6, width=10, dpi=600)
+```
+
+
+###Compare across lineages
+
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(ggpubr)
+
+counts_in = read.csv("D:/Sequence_Data/Phylogenetics_Project/2023_September_FinalFilesForPaper/2023_Oct2_LRR_RLK_Counts.csv", header=TRUE)
+#colnames(counts_in) = c("Species","I.1", "II", "III", "IV", "V", "VI.1", "VI.2", "VII.1", "VII.2", "VII.3", "VIII.1", "VIII.2", "IX", "Xa", "Xb.1a", "Xb.1b", "Xb.2", "XI.1a", "XI.1b", "XI.1c", "XII", "XIII.a", "XIII.b", "XIV", "XV", "Total","Order")
+
+lineage_to_examine = "Malvales"
+palette_colour="#7649c3"
+
+counts_lineage = counts_in[counts_in[,c("Order")] == lineage_to_examine & counts_in[,c("Species")] != c("Pumbi"),]
+#counts_III = counts_in[,c("Species", "I.1", "Order")]
+#counts_VII1 = counts_in[,c("Species", "VIII.1", "Order")]
+
+
+
+
+#Pull out only subfamilies we want to examine
+#counts_lineage_filtered = counts_lineage[,c("Species","I.1","III","VIII.1","VIII.2","XI.1b","XI.1c","XII","Total","Order")]
+#Rename
+
+
+#Change from wide to long format for ggplot if using all
+df_to_graph = gather(counts_lineage, key="LRR_Family", value="Count", -1,-"Total",-"Order")
+#Change from wide to long format for ggplot if using lineage_filtered
+#df_to_graph = gather(counts_lineage_filtered, key="LRR_Family", value="Count", -1,-9,-10)
+#df_to_graph = counts_lineage_filtered
+
+
+#average_order_count = matrix(nrow=length(unique(counts_I_XII_filtered$Order)), ncol=3)
+#rownames(average_order_count) = sort(unique(counts_I_XII_filtered$Order
+#colnames(average_order_count) = c("Order", "I.1", "XII")
+#average_order_count[,1] = sort(unique(counts_I_XII_filtered$Order))
+
+
+
+#df_to_graph = counts_lineage_filtered
+#df_to_graph[,2] = df_to_graph[,3]*100
+  
+
+
+
+#anova_test = aov(I.1 ~ Order, data=df_to_graph)
+#tukey_test = TukeyHSD(anova_test, conf.level=0.95)
+
+#plot_order = c("Brassicales", "Bryophytes", "Caryophyllales", "Chlorophyta", "Fabales", "Malpighiales", "Malvales", "Poales", "Rosales", "Sapindales", "Other")
+plot_order = c("I.1", "II", "III", "IV", "V", "VI.1", "VI.2", "VII.1", "VII.2", "VII.3", "VIII.1", "VIII.2", "IX", "Xa", "Xb.1a", "Xb.1b", "Xb.2", "XI.1a", "XI.1b", "XI.1c", "XII", "XIII.a", "XIII.b", "XIV", "XV")
+order_groups = sort(rep(plot_order, 2))
+
+#ggplot(df_to_graph, aes(factor(x=Order, levels = plot_order), y=Count*100, fill=LRR_Family)) + geom_boxplot() + theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) + geom_point(aes(group=LRR_Family), size=0.1) + xlab("Order") + ylab("Percentage of total LRR-RLKs")+ geom_line()
+
+
+df_to_graph$Count = df_to_graph$Count/df_to_graph$Total*100
+
+#total count normalized
+ggboxplot(df_to_graph, x="LRR_Family", y="Count", order = plot_order, point.size=0.1, outlier.size=0.1, fill="Order", palette=c(palette_colour), xlab="Subfamily", ylab="Percentage of total LRR-RLKs") + rotate_x_text(angle = 45) + geom_hline(yintercept = mean(df_to_graph$Count), linetype = 2) + stat_compare_means(method="anova", label.x = 1.5, label.y = max(df_to_graph$Count+4)) + stat_compare_means(label = "p.signif", method = "t.test", ref.group = ".all.")    
+
+#ancestor_normalized
+#ggboxplot(df_to_graph, x="Order", y="I.1", point.size=0.1, outlier.size=0.1, xlab="Order", ylab="Normalized Count") + rotate_x_text(angle = 45) + geom_hline(yintercept = mean(df_to_graph$I.1), linetype = 2) + stat_compare_means(method="anova", label.y = 0.05, label.x = 1.5) + stat_compare_means(label = "p.signif", method = "t.test", ref.group = ".all.")
+
+
+
+
+ggsave(paste("D:/Sequence_Data/Phylogenetics_Project/Pictures/2023_Oct_LRR-",lineage_to_examine,"_LRRCountTotalPercentage_globalmean_comparison_anova_ttest.png", sep=""),height=6, width=10, dpi=600)
+#ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/Test.png",height=6, width=10, dpi=600)
+
+```
+###Stats 
+
+```{r}
+
+library(ggpubr)
+
+
+comparison = compare_means(I.1 ~ XII, data=counts_I_XII)
+
+p = ggboxplot(df_to_graph, x="Order", y="Count", fill="LRR_Family") + stat_compare_means()
+
+
+
+```
+
+###Plot OG stuff
+```{r}
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+
+
+dir = "D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/RLKs_Only/"
+OG_csv = read.csv(paste(dir, "OG_Membership_for_collection.csv", sep=""))
+
+OG_csv$Pangenome=factor(x=OG_csv$Pangenome, levels=c("Private","Cloud","Shell","Almost Core", "Core"))
+
+trans <- function(x){pmin(x,70) + 0.05*pmax(x-70,0)}
+yticks=(c(0,20,40,100,300,400, 500))
+
+#OG_csv$Gene.Cluster.Number = trans(OG_csv$Gene.Cluster.Number)
+OG_bottom = OG_csv
+OG_bottom[1,2] = 60
+
+OG_top = OG_csv
+OG_top$Gene.Cluster.Number=0
+OG_top[1,2] = OG_csv[1,2]
+
+og_bottom_plot = ggplot(data=OG_csv, mapping=aes(x=OG.Number, y=Gene.Cluster.Number, fill=Pangenome)) + geom_bar(stat="identity") + scale_fill_manual(values=c("green", "blue", "orange","grey","darkgrey")) + coord_cartesian(ylim=c(0,40)) 
+
+og_top_plot = ggplot(data=OG_csv, mapping=aes(x=OG.Number, y=Gene.Cluster.Number, fill=Pangenome)) + geom_bar(stat="identity") + scale_fill_manual(values=c("green", "blue", "orange","grey","darkgrey")) + coord_cartesian(ylim=c(400,500)) + scale_y_continuous(breaks=seq(400,500,by=25)) + xlab("") + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) 
+
+og_output_plot = og_top_plot/og_bottom_plot + plot_layout(ncol=1, height=c(1,1))
+
+og_output_plot
+
+ggsave("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/Figures/OG_collection_split.png",height=10, width=15, dpi=600)
+
+
+```
+
+###hierarchical clutsering
+```{r}
+library(dplyr)
+library(ggplot2)
+library(ggdendro)
+library(pvclust)
+
+data_in = read.csv("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/RLKs_Only/RLKs_HOGs_BlastSplit.csv")
+
+og_data = data_in[,4:ncol(data_in)]
+
+og_data = t(data_in[,4:ncol(data_in)])
+
+
+ecotype_clustering = hclust(dist(og_data), method="average")
+
+ggdendrogram(ecotype_clustering, rotate = FALSE, size = 2)
+
+pvclustering = pvclust(og_data, method.dist="cor", method.hclust="average", nboot=1000)
+
+
+png("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/Figures/Ecotype_presabs_HClust.png", height=5, width=25, units = "in", res=300)
+plot(pvclustering, hang=-1, cex=0.5)
+dev.off()
+
+ggsave("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/Figures/Ecotype_presabs_HClust.png",height=5, width=20, dpi=300, limitsize = FALSE)
+
+```
+
+
+
+

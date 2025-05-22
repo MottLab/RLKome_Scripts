@@ -1,0 +1,53 @@
+---
+title: "Map_Cooridnates"
+author: "Zach Kileeg"
+date: "2025-01-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+###chunk takes as input a csv with lat/lon information and plots it by group 
+```{r}
+library(dplyr)
+library(ggplot2)
+library(maps)
+library(ggrepel)
+#library(sf)
+
+ecotype_csv = read.csv("D:/Sequence_Data/Ecotype_DataFiles/Data_Files/Ecotype_information/Ecotype_in_pangenome.csv")
+
+ecotype_sf = st_as_sf(ecotype_csv, coords = c("lat","lon"))
+ecotype_sf = st_set_crs(ecotype_sf, 4326)
+
+ggplot(ecotype_sf) + geom_sf(aes(color=geometry))
+
+p = ggplot() + coord_fixed() + xlab("") + ylab("")
+base_world = p + geom_polygon(data=map_data("world"), aes(x=long, y=lat, group=group), colour="light blue", fill="light blue") + theme_bw()
+base_world
+
+#dots_on_plot = 
+base_world + geom_point(data=ecotype_csv, aes(x=lon, y=lat, color=admixture), size=0.5) + 
+  geom_label_repel(mapping=aes(label=Name, x=lon, y=lat, color=admixture, segment.size=0.1, segment.inflect=FALSE, segment.linetype=1, segment.curvature=1, segment.shape=1), data=ecotype_csv, size=3, box.padding=0.5, force=100, max.time=10000, max.overlaps=300) + scale_color_manual(values=c("#710051","#cba400","#009e78" ))
+
+#geom_text_repel(mapping=aes(label=Name, x=lon, y=lat, segment.size=0.1, segment.inflect=TRUE, segment.linetype=1), data=ecotype_csv, #size=3, nudge_x=1, nudge_y=1, box.padding=1, force=1000, max.time=100000, max.overlaps=300) +
+
+
+
+ggsave(paste("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/Figures/Ecotype_Map.png", sep=""),height=15, width=30, dpi=300, limitsize=FALSE)
+
+
+
+#dots_on_plot
+
+ 
+#map_final = dots_on_plot + geom_text_repel(aes(label=Name),data=ecotype_csv)
+
+#map_final
+
+
+
+```

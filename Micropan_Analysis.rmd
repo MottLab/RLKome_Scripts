@@ -1,0 +1,187 @@
+---
+title: "Micropan_Analysis"
+author: "Zachary Kileeg"
+date: "12/20/2020"
+output: html_document
+---
+
+
+```{r}
+#load requisite packages
+require(micropan)
+require(ggplot2)
+require(tidyr)
+
+
+
+#load in directory where fastas are, and get a list of the fasta files in this directory
+directory = "C:/Users/kileegza/Documents/microPan/FASTAs/S-locus"    #-------------->Input directory where your fasta files are stored.
+
+fastas = list.files(directory, pattern = ".fasta")
+
+#genome_id = paste("GID", gsub("\\..*", "", fastas[i]), sep = ""
+
+################################## Core Processes ###########################################
+
+#This part runs Micropan
+
+
+#Create directories for output. If they already exists, a warning will be shown but it can be ignored
+dir.create(paste(directory,"/panPrep", sep=""))
+dir.create(paste(directory,"/Blast_Out", sep=""))
+
+
+for (i in 1: length(fastas)){
+  
+  #Prepare fasta files for further usage in microPan. NOTE: this command inserts the genome_id in the out file name just before the extension
+  panPrep(in.file = paste(directory, "/", fastas[i], sep = ""), genome_id = paste("GID", i, sep = ""), out.file = paste(directory, "/panPrep/", "panPrep", tools::file_path_sans_ext(basename(fastas[i])), ".faa", sep = ""))
+}
+
+#Get list of fasta files that have been prepared by panPrep
+panPrep_prot_list = list.files(paste(directory, "/panPrep", sep=""), pattern = ".faa", full.names=TRUE)
+
+
+
+
+#Perform blast all vs all
+blastpAllAll(prot.files=panPrep_prot_list, out.folder=paste(directory, "/Blast_Out", sep=""), e.value = 0.01) 
+
+#Get list of blast output files
+blastfiles = list.files(paste(directory, "/Blast_Out", sep=""), pattern=".txt", recursive=FALSE, full.names=TRUE)
+
+#calculate distance between proteins from blast alignment
+distance = bDist(blast.files = blastfiles, e.value = 0.01)
+
+#Cluster using complete or single linkage
+clustered = bClust(distance, linkage = "complete", threshold=0.5, verbose=TRUE)
+#clustered = bClust(distance, linkage = "single")
+
+#Get panmatrix for graph generation
+matrix = panMatrix(clustering = clustered)
+
+#if from a file, use this
+matrix = OG_Data[,4:ncol(OG_Data)]
+
+#Create rarefaction curve
+curve = rarefaction(matrix, n.perm = 100)  
+
+avg_curve = curve[,1:2]
+
+for (i in nrow(curve)){
+  avg_curve[i,2] = mean(as.numeric(curve[i,2:ncol(curve)]))
+}
+
+#creates a binomial mixture model to predict occurrence of core genes and total pangenome size if ALL genomes are sequenced
+fitted = binomixEstimate(matrix, K.range = 2:10)
+
+
+###########################Additional Information Processes###################
+
+#Find number of clusters present in this pangenome
+num_clusters = length(unique(clustered))
+
+#determine num genes in each cluster and output it
+cluster_sizes = matrix(nrow=num_clusters, ncol=1)
+for (i in 1:nrow(cluster_sizes)){
+  
+  cluster_sizes[i] = length(clustered[clustered == i])
+}
+
+#find average num genes per cluster. The average shouldn't be too much more than the number of genomes, as we expect most a lot of singleton orthogroups
+average_cluster_size = mean(cluster_sizes[,1])
+median_cluster_size = median(cluster_sizes[,1])
+
+
+colnames(matrix) = 1:146
+matrix = matrix %>% mutate_if(is.numeric,~1 *(. != 0))
+
+#estimate if genome is open (new genes added for every ecotype) or closed (eventual number of genomes no new )
+heaps_estimate = heaps(matrix, n.perm=10)
+
+core = isOrtholog(clustered,distance)
+
+
+#LRRRLP_9_ecotype_fitted = fitted
+
+print(clustered[clustered == 2])
+
+weights_test = geneWeights(matrix)
+
+#Plot similarity of genes across blast results in histogram
+fig3 <- ggplot(distance) +
+  geom_histogram(aes(x = Distance), bins = 100)
+print(fig3)
+
+##############       Graphing Section     ###################
+
+#ggplot(data = curve, mapping = aes(x = curve$Genome, y = curve$Perm1, group = Permutation))
+
+#Plot the rarefaction curve with permutation lines
+curve %>% gather(key = "Permutation", value = "Clusters", -Genome) %>% ggplot(aes(x = Genome, y = Clusters, group = Permutation)) +geom_line()
+
+
+curve %>% gather(key = "Permutation", value = "Clusters", -Genome) %>% ggplot(aes(x = Genome, y = Clusters, group = Permutation)) +geom_point()
+
+
+
+#Plot the average rarefaction curve
+avg_curve %>% gather(key = "Permutation", value = "Clusters", -Genome) %>% ggplot(aes(x = Genome, y = Clusters, group = Permutation)) +geom_point() +geom_smooth()
+
+
+
+tibble(Clusters = as.integer(table(factor(colSums(matrix > 0),
+                                          levels = 1:nrow(matrix)))),
+      Genomes = 1:nrow(matrix)) %>% 
+ggplot(aes(x = Genomes, y = Clusters)) +
+geom_col() + labs(title = "Number of clusters found in 1, 2,...,all genomes")
+
+
+
+#Create pie graph to predict occurrence of core and rare genes across sample
+ncomp <- 3 #THIS NEEDS TO BE CHANGED DEPENDING ON FITTED! Number of components. This is equivalent to the K value from the binomial mixture model
+fig4 <- fitted$Mix.tbl %>% 
+  filter(Components == ncomp) %>% 
+  ggplot() +
+  geom_col(aes(x = "", y = Mixing.proportion, fill = Detection.prob)) +
+  coord_polar(theta = "y") +
+  labs(x = "", y = "", title = "Pan-genome gene family distribution",
+       fill = "Detection\nprobability") +
+  scale_fill_gradientn(colors = c("pink", "orange", "green", "cyan", "blue"))
+print(fig4)
+
+
+fig5 <- fitted$Mix.tbl %>% 
+  filter(Components == ncomp) %>% 
+  mutate(Single = Mixing.proportion * Detection.prob) %>%
+  ggplot() +
+  geom_col(aes(x = "", y = Single, fill = Detection.prob)) +
+  coord_polar(theta = "y") +
+  labs(x = "", y = "", title = "Average genome gene-family distribution",
+       fill = "Detection\nprobability") +
+  scale_fill_gradientn(colors = c("pink", "orange", "green", "cyan", "blue"))
+print(fig5)
+
+
+d.man <- distManhattan(matrix)
+
+ggdendrogram(dendro_data(hclust(d.man, method = "average")),
+             rotate = TRUE, theme_dendro = FALSE) +
+  labs(x = "Genomes", y = "Manhattan distance", title = "Pan-genome dendrogram")
+
+###########################################################################################################  
+  
+test = panPrep("C:/Users/kileegza/Documents/Non-Github analysis/microPan/An_LRR_Protein.fasta", "AN_1", "C:/Users/kileegza/Documents/Non-Github analysis/microPan/An_LRR_Protein.fasta" )
+micropan::rarefaction()
+
+testfast = microseq::readFasta("C:/Users/kileegza/Documents/microPan/FASTAs/panPrep/panPrep_GID1.faa")
+
+
+findGenes("C:/Users/kileegza/Documents/Non-Github analysis/Genome Data/1001_pseudo_test.fa")
+
+ortholog_test=isOrtholog(clustered, distance)
+which(ortholog_test)
+
+
+
+
+```

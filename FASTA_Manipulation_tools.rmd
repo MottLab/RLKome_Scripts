@@ -1,0 +1,926 @@
+---
+title: "Fasta_Manipulation_Tools"
+author: "Zachary Kileeg"
+date: "11/10/2020"
+output: html_document
+---
+
+
+
+
+##Prepare sequences for blast. This chunk takes the assembled contigs as input, removes any contigs less than 500 bp in length, and then output that into a fasta file. 
+```{r}
+
+library(phylotools)
+library(dplyr)
+
+fastadirs = list.dirs("D:/Analysis_Output/SAMTools_Output/Output_BAM_Files/Short_Read/FASTQ_Assemblies", recursive=FALSE)
+
+
+for (i in 1:length(fastadirs)){
+  
+  fastaname = paste(fastadirs[i], "/Abyss_Assembly/", gsub("_.*","",basename(fastadirs[i])), "-6.fa", sep="")
+  
+  fasta_in = read.fasta(fastaname)
+  
+  clean_fasta = fasta_in %>% filter(nchar(seq.text)>500)
+  
+  if (dim(clean_fasta)[1]>0) {
+    
+    clean_fasta$seq.name = paste(">", gsub(" ", "_", clean_fasta$seq.name), sep="")
+  
+  
+  
+   if (!dir.exists(paste("C:/Users/kileegza/Documents/Blast/Blast_In/Denovo_Assembly/",gsub("_.*", "", basename(fastadirs[i])), sep=""))) {
+    
+     dir.create(paste("C:/Users/kileegza/Documents/Blast/Blast_In/Denovo_Assembly/",gsub("_.*", "", basename(fastadirs[i])), sep=""))
+  
+    }
+  
+  write.table(clean_fasta, file=paste("C:/Users/kileegza/Documents/Blast/Blast_In/Denovo_Assembly/",gsub("_.*", "", basename(fastadirs[i])), "/",gsub("_.*", "", basename(fastadirs[i])), "_Denovo_assembled_Cleaned.fasta", sep=""), quote=FALSE, sep="\n", col.names=FALSE, row.names=FALSE)
+  
+  } else
+    
+    print("No sequences > 500 bp in length")
+  
+}
+
+
+
+
+
+
+```
+
+
+
+##Chunk 
+```{r}
+
+library(stringr)
+library(phylotools)
+library(dplyr)
+
+#Read csv containing a single csv file with all gene/protein names in it
+#Ecotype_CSV = read.csv("C:/Users/kileegza/Documents/Short_Term_Excel_files/Conservative_LRR_RLP_Sequence_Names.csv")
+Ecotype_CSV = as.data.frame(read.csv("C:/Users/kileegza/Documents/Short_Term_Excel_Files/RLP_Orthogroup_CLustering_tofigureshitout.csv"))
+
+outdirectory = "C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/RLPs_for_OG_filtering/"
+out_suffix = "_possible_LRRRLPs.fasta"
+  
+HMMSearch_Output_Directories = list.dirs("C:/Users/kileegza/Documents/HMMER/HMMSEARCH_Outputs/Jan_2021_26_Ecotype_LRR", recursive=FALSE)
+
+#get a list of the fastafiles to be used to extract sequences
+fasta_files = list.files("C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/Cleaned_Sep_2020", pattern="*.fasta", recursive=FALSE, full.names=TRUE)
+
+#This loop here is if you have one csv file with the genes in it
+
+for (i in 1:length(fasta_files)){
+  
+  #If you want to filter outputs by a list, insert it here. This line reads into memory the hmmsearch output
+  HMMSearch_Out_CSV=read.csv(list.files(path=HMMSearch_Output_Directories[i], pattern="*.csv", recursive=FALSE, full.names=TRUE))
+  
+  
+  #tell user which file being worked on
+  print(paste("Outputting ", str_extract(basename(fasta_files[i]), "^([^_]*)"), sep=""))
+  
+  #import fasta file as a data frame. 
+  fasta_prot = as.data.frame(read.fasta(fasta_files[i])) 
+  
+  #this is disgusting regex but it works. It removes "Ecotypename_" and the splice variant 
+  #fasta_prot$seq.name = str_replace(str_replace(fasta_prot$seq.name,"\\.[0-9]",""), "^.*_","")
+  fasta_prot$seq.name = str_replace(fasta_prot$seq.name, "^.*_","")
+  
+  
+  filter_kinases_NLRs=unique(c(HMMSearch_Out_CSV$pkise_only, HMMSearch_Out_CSV$NB.ARC))
+  
+  ecotype_RLPs = as.data.frame(Ecotype_CSV[,i])
+  colnames(ecotype_RLPs) = "Potential_RLPs"
+  
+  
+  subtracted_NLRs_Kinases= ecotype_RLPs %>% filter(!(Potential_RLPs %in% filter_kinases_NLRs))
+  
+  #Holding variable things uses dplyr to find sequences in the ecotype fasta file found in the ecotype csv
+  things = fasta_prot %>% filter(seq.name %in% subtracted_NLRs_Kinases$Potential_RLPs)
+  
+  if (nrow(things) !=0){
+    
+    if (length(grep(pattern="-",x=things[1,1]))>0){
+      
+       things$seq.name = paste(">", things$seq.name, sep="")
+      
+    
+      
+  #Add '>' to the front of sequence names to match fasta format
+  
+    
+  } else {
+    
+      things$seq.name = paste(">", str_extract(basename(fasta_files[i]),"^([^_]*)"), "_", things$seq.name, sep="")
+    #things$seq.name = paste(">", things$seq.name, sep="")
+         
+  
+    }
+    
+  } 
+  
+  #write the sequence to fasta file.
+     write.table(things, paste(outdirectory, str_extract(basename(fasta_files[i]), "^([^_]*)"), out_suffix, sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+     
+
+}
+
+
+```
+
+
+
+
+
+
+####This chunk is meant to take a concantenated fasta file, such as the orthogroup outputs, and split them into their ecotypes
+```{r}
+
+library(stringr)
+library(phylotools)
+library(dplyr)
+
+#Read csv containing a single csv file with all gene/protein names in it
+#Ecotype_CSV = read.csv("C:/Users/kileegza/Documents/Short_Term_Excel_files/Conservative_LRR_RLP_Sequence_Names.csv")
+#Ecotype_CSV = as.data.frame(read.csv("C:/Users/kileegza/Documents/Short_Term_Excel_Files/RLP_Orthogroup_CLustering_tofigureshitout.csv"))
+
+outdirectory = "C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/OG_FIltered_RLPs_Potential/"
+out_suffix = "_possible_LRRRLPs.fasta"
+  
+#HMMSearch_Output_Directories = list.dirs("C:/Users/kileegza/Documents/HMMER/HMMSEARCH_Outputs/Jan_2021_26_Ecotype_LRR", recursive=FALSE)
+
+#get a list of the fastafiles to be used to extract sequences
+fasta_files = list.files("C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/Cleaned_Sep_2020", pattern="*.fasta", recursive=FALSE, full.names=TRUE)
+
+OG_Filtered_Fastas = list.files("C:/Users/kileegza/Documents/Orthofinder/Orthofinder_output/Jan23_2021_26_Ecotype_Pkinases/Results_Jan23/Orthogroup_Sequences/Family_Filtered", full.names=TRUE)
+
+#Orthogroup_Filtered_FASTA=read.fasta("C:/Users/kileegza/Documents/Orthofinder/Orthofinder_output/ALL_LRRs_Filtering/Results_Jan20/Orthogroup_Sequences/Potential_RLPs.fa")
+
+#Invoke the outside loop (with j) if you have multiple fasta files you want to split into ecotypes
+for (j in 1:length(OG_Filtered_Fastas)){
+  
+  print(paste("Working on family...", str_extract(basename(OG_Filtered_Fastas[j]), "^([^_]*)"), sep=""))
+  
+  
+  Orthogroup_Filtered_FASTA=read.fasta(OG_Filtered_Fastas[j])
+  
+  outdirectory = paste("C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/Jan25_2021_RLKs_OG_Filtered/", str_extract(basename(OG_Filtered_Fastas[j]), "^([^_]*)"), "/", sep="")
+  
+  out_suffix = paste("_possible_", str_extract(basename(OG_Filtered_Fastas[j]), "^([^_]*)"), ".fasta", sep="")
+  
+  if (!dir.exists(outdirectory)) {
+    dir.create(outdirectory)
+  }
+  
+  
+for (i in 1:length(fasta_files)){
+  
+  #If you want to filter outputs by a list, insert it here. This line reads into memory the hmmsearch output
+  #HMMSearch_Out_CSV=read.csv(list.files(path=HMMSearch_Output_Directories[i], pattern="*.csv", recursive=FALSE, full.names=TRUE))
+  
+  
+  #tell user which file being worked on
+  print(paste("Outputting ", str_extract(basename(fasta_files[i]), "^([^_]*)"), sep=""))
+  
+  #import fasta file as a data frame. 
+  fasta_prot = as.data.frame(read.fasta(fasta_files[i])) 
+  
+  
+  #this is disgusting regex but it works. It removes "Ecotypename_" and the splice variant 
+  #fasta_prot$seq.name = str_replace(str_replace(fasta_prot$seq.name,"\\.[0-9]",""), "^.*_","")
+ # fasta_prot$seq.name = str_replace(fasta_prot$seq.name, "^.*_","")
+  
+  
+  #filter_kinases_NLRs=unique(c(HMMSearch_Out_CSV$pkise_only, HMMSearch_Out_CSV$NB.ARC))
+  
+  #ecotype_RLPs = as.data.frame(Ecotype_CSV[,i])
+  #colnames(ecotype_RLPs) = "Potential_RLPs"
+  
+  
+  #subtracted_NLRs_Kinases= ecotype_RLPs %>% filter(!(Potential_RLPs %in% filter_kinases_NLRs))
+  
+  #Holding variable things uses dplyr to find sequences in the ecotype fasta file found in the ecotype csv
+  things = fasta_prot %>% filter(seq.name %in% Orthogroup_Filtered_FASTA$seq.name)
+   
+  
+  if (nrow(things) !=0){
+    
+    things$seq.name = paste(">", things$seq.name, sep="")
+    
+  } 
+  
+  #write the sequence to fasta file.
+     write.table(things, paste(outdirectory, str_extract(basename(fasta_files[i]), "^([^_]*)"), out_suffix, sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+     
+
+  }
+}
+
+
+```
+
+
+###Convert protein to coding sequences
+```{r}
+library(stringr)
+library(phylotools)
+library(dplyr)
+
+#Read csv containing a single csv file with all gene/protein names in it
+#Ecotype_CSV = read.csv("C:/Users/kileegza/Documents/Short_Term_Excel_files/Conservative_LRR_RLP_Sequence_Names.csv")
+#Ecotype_CSV = as.data.frame(read.csv("C:/Users/kileegza/Documents/Short_Term_Excel_Files/RLP_Orthogroup_CLustering_tofigureshitout.csv"))
+
+outdirectory = "C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/OG_FIltered_RLPs_Potential/"
+out_suffix = "_possible_LRRRLPs.fasta"
+  
+#HMMSearch_Output_Directories = list.dirs("C:/Users/kileegza/Documents/HMMER/HMMSEARCH_Outputs/Jan_2021_26_Ecotype_LRR", recursive=FALSE)
+
+#get a list of the fastafiles to be used to extract sequences
+fasta_files = list.files("D:/Sequence_Data/Ecotype_DataFiles/FASTA_Files/Genome_Files/26_Ecotype_CDS", pattern="*.fasta", recursive=FALSE, full.names=TRUE)
+
+
+OG_Filtered_Fastas = list.files("C:/Users/kileegza/Documents/Orthofinder/Orthofinder_output/Jan23_2021_26_Ecotype_Pkinases/Results_Jan23/Orthogroup_Sequences/Family_Filtered", pattern="*.fasta", full.names=TRUE)
+
+#Orthogroup_Filtered_FASTA=read.fasta("C:/Users/kileegza/Documents/Orthofinder/Orthofinder_output/ALL_LRRs_Filtering/Results_Jan20/Orthogroup_Sequences/Potential_RLPs.fa")
+
+#Invoke the outside loop (with j) if you have multiple fasta files you want to split into ecotypes
+for (j in 1:length(OG_Filtered_Fastas)){
+  
+  print(paste("Working on family...", str_extract(basename(OG_Filtered_Fastas[j]), "^([^_]*)"), sep=""))
+  
+  
+  Orthogroup_Filtered_FASTA=read.fasta(OG_Filtered_Fastas[j])
+  
+  outdirectory = paste("D:/Sequence_Data/Ecotype_DataFiles/FASTA_Files/Genome_Files/Pangenome_RLKs_NLRs_RLPs_CDS/", str_extract(basename(OG_Filtered_Fastas[j]), "^([^_]*)"), "/", sep="")
+  
+ # outdirectory = "D:/Sequence_Data/Ecotype_DataFiles/FASTA_Files/Genome_Files/Pangenome_RLKs_NLRs_RLPs_CDS/RLPs/"
+  
+  out_suffix = paste("_possible_", str_extract(basename(OG_Filtered_Fastas[j]), "^([^_]*)"), "_CDS.fasta", sep="")
+ # out_suffix= "_possible_RLP_CDS.fasta"
+  
+  if (!dir.exists(outdirectory)) {
+    dir.create(outdirectory)
+  }
+  
+   #for specific families
+  #NLR_Fastas = list.files("C:/Users/kileegza/Documents/Orthofinder/Orthofinder_Proteomes/Athal_Ecotypes/OG_Filtered_RLPs", full.name=TRUE)
+  
+  
+for (i in 1:length(fasta_files)){
+  
+  #If you want to filter outputs by a list, insert it here. This line reads into memory the hmmsearch output
+  #HMMSearch_Out_CSV=read.csv(list.files(path=HMMSearch_Output_Directories[i], pattern="*.csv", recursive=FALSE, full.names=TRUE))
+  
+  
+  #tell user which file being worked on
+  print(paste("Outputting ", str_extract(basename(fasta_files[i]), "^([^_]*)"), sep=""))
+  
+  #import fasta file as a data frame. 
+  fasta_prot = as.data.frame(read.fasta(fasta_files[i])) 
+  
+ 
+  Orthogroup_Filtered_FASTA = read.fasta(NLR_Fastas[i])
+  #this is disgusting regex but it works. It removes "Ecotypename_" and the splice variant 
+  #fasta_prot$seq.name = str_replace(str_replace(fasta_prot$seq.name,"\\.[0-9]",""), "^.*_","")
+  #fasta_prot$seq.name = str_replace(fasta_prot$seq.name, "^.*_","")
+  #if (length(grep(pattern="_",fasta_prot[1,1])>0)){
+   # fasta_prot$seq.name = paste(str_extract(basename(fasta_files[i]), "^.*_"),fasta_prot$seq.name, sep="")
+  #}
+  
+  
+  #filter_kinases_NLRs=unique(c(HMMSearch_Out_CSV$pkise_only, HMMSearch_Out_CSV$NB.ARC))
+  
+  #ecotype_RLPs = as.data.frame(Ecotype_CSV[,i])
+  #colnames(ecotype_RLPs) = "Potential_RLPs"
+  
+  
+  #subtracted_NLRs_Kinases= ecotype_RLPs %>% filter(!(Potential_RLPs %in% filter_kinases_NLRs))
+  
+  #Holding variable things uses dplyr to find sequences in the ecotype fasta file found in the ecotype csv
+  things = fasta_prot %>% filter(seq.name %in% Orthogroup_Filtered_FASTA$seq.name)
+   
+  
+  if (nrow(things) !=0){
+    
+    things$seq.name = paste(">", things$seq.name, sep="")
+    
+  } 
+  
+  #write the sequence to fasta file.
+     write.table(things, paste(outdirectory, str_extract(basename(fasta_files[i]), "^([^_]*)"), out_suffix, sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+     
+
+  }
+}
+
+
+```
+
+
+##This chunk splits and filters fasta as needed
+```{r}
+library(dplyr)
+library(phylotools)
+library(stringr)
+
+#get input fasta file to work on
+input_fasta_to_split = read.fasta("D:/Sequence_Data/Ecotype_DataFiles/Genome_Files/Athaliana/Araport11_pep_20160703_representative_gene_model.fasta")
+
+#get 5 letter code to split if needed
+five_letter_code = unique(str_extract(input_fasta_to_split$seq.name, "^*([^_]*)"))
+
+filter_cutoff = 740
+
+#filter fasta by size, in this case all entries with more than X nucleotides
+filtered_fasta = input_fasta_to_split %>% filter(nchar(seq.text)>filter_cutoff)
+
+filtered_fasta$seq.name = paste(">", filtered_fasta$seq.name, sep="")
+
+write.table(filtered_fasta, "D:/Analysis_Output/Bowtie2/2022_63_BW2_LocalAlign_Ecotype_IterativeHybridAssembly.fasta", col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+
+```
+
+
+
+###This chunk is meant to take protein/DNA sequences, a list of sequences, and return only the fasta sequences of those found in the file. Works for txt input (tab-delimited) 
+
+```{r}
+
+library(phylotools)
+library(dplyr)
+
+
+
+#input_list = read.table("D:/Analysis_Output/GenePrediction_Output/Augustus/Ecotypes/LRRContaining_butnotkinaseapparently.txt")
+#input_list = read.table("D:/Analysis_Output/GenePrediction_Output/Augustus/2022_BW2_end2end_AugustusPredicted_NewLRRRLPs_list.txt", header=F)
+input_list = read.csv("D:/Sequence_Data/Phylogenetics_Project/LRRVIII.2_List.csv")
+
+
+input_fasta = read.fasta("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/Mar30_2021_Phytozome_Primary_Transcripts/2021_July9th_LRR_Only_Concatenated.fasta")
+#input_fasta = read.fasta("D:/Analysis_Output/GenePrediction_Output/Augustus/2022_63_BW2_EndtoEndAlign_Ecotype_IterativeHybridAssembly.fasta")
+
+
+input_fasta$seq.name = gsub(" ", "", input_fasta$seq.name)
+
+fastas = input_fasta %>% filter(seq.name %in% input_list[,1])
+
+fasta_names = fastas$seq.name
+
+fastas$seq.name = paste(">", fastas$seq.name, sep="")
+
+
+
+write.table(fastas, "D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/2023_Apr10_LRRVII.2_FullLength.fasta", col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+
+for(i in 1:nrow(fastas)){
+  
+  write.table(fastas[i,], paste("D:/Analysis_Output/GenePrediction_Output/Gemoma/2022_BW2_EndtoEnd_63Ecotype_IterativeAssembly/", fasta_names[i], "_BW2EndtoEnd54Ecotype_prediction.fasta", sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+
+  
+}
+
+
+
+```
+
+
+#take fasta input and clean them up then separate by subgroup
+```{r}
+
+library(phylotools)
+library(dplyr)
+library(stringr)
+
+input_name_file = read.csv("D:/Sequence_Data/Phylogenetics_Project/LRK10Ls/2022_Aug16_Predicted_LRK10L_Genes_25Species.csv", header=FALSE)
+input_fasta = read.fasta("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/2022_Apr19_25Species_KinaseOnly_MultipleOutgroup.fasta")
+
+for (i in 1:ncol(input_name_file)){
+  
+  filtered_fasta = input_fasta %>% filter(seq.name %in% input_name_file[,i])
+  
+  filtered_fasta$seq.name = paste(">", filtered_fasta$seq.name, sep="")
+
+  write.table(filtered_fasta, paste("D:/Sequence_Data/Phylogenetics_Project/Family_Subclades/Full_length/LRRI_Subclades/Aug_2022/2022_Aug8_", colnames(input_name_file[i]), ".fasta", sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+  
+  print(c("Exporting", colnames(input_name_file[i])))
+  
+}
+
+input_fasta$seq.name = gsub("\\..*", "", input_fasta$seq.name)
+input_fasta$seq.name = gsub(" ", "", input_fasta$seq.name)
+
+#if a matrix/DF use top
+filtered_fasta = input_fasta %>% filter(seq.name %in% input_name_file[,1])
+#in a vector, use bottom
+filtered_fasta = input_fasta %>% filter(seq.name %in% input_name_file)
+
+filtered_fasta$seq.name = paste(">", filtered_fasta$seq.name, sep="")
+
+write.table(filtered_fasta, paste("D:/Sequence_Data/Phylogenetics_Project/LRK10Ls/2022_Aug_predictedLRK10Ls_24Species_KinaseOnly_SequenceHasECD.fasta", sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+
+
+```
+
+##Take coordinate file input and remove positions not wanted to get unique sequences
+
+```{r}
+
+library(phylotools)
+library(dplyr)
+library(stringr)
+library(IRanges)
+
+genome = "An1_Col_Test"
+
+input_fasta = read.fasta("D:/Analysis_Output/Nucmer/Input_Genomes_forsanity/An-1.chr.all.v2.0.fasta")
+input_fasta = read.fasta("D:/Analysis_Output/Nucmer/Input_Genomes_forsanity/Col.Athaliana_447_TAIR10.fasta")
+row.names(input_fasta) = input_fasta$seq.name
+
+overlapping_positions = read.table("D:/Analysis_Output/Nucmer/10_Ecotype_Nucmer.coords", header=FALSE)
+overlapping_positions = overlapping_positions %>% filter(V5 > 250)
+
+thing=matrix(nrow=nrow(overlapping_positions))
+for (j in 2:nrow(overlapping_positions)){
+  
+  #print(j)
+  
+  if((overlapping_positions[j,1] - overlapping_positions[j-1,2]) < 100)
+  {
+    #print("Yes")
+    thing[j,1] = "TRUE"
+  }
+  else
+  {
+    #print("No")
+    thing[j,1] = "FALSE"
+  }
+  
+}
+
+overlapping_positions = cbind(overlapping_positions, thing)
+
+test_positions = overlapping_positions %>% filter(V5 > 10000)
+
+#overlapping_groups = overlapping_positions %>% filter(V10==test_positions[1,10] & )
+
+#overlapsRef = split(IRanges(start=overlapping_positions$V1, stop=overlapping_positions$V2), overlapping_positions$V10)
+
+#overlapping_positions = read.table("D:/Analysis_Output/Nucmer/8Ecotype_Paper/Col_An1_C24_Cvi_Eri_KBSmac74_Kyo_Ler_Nd1_Sha_Nucmer_coordinateslist.txt", header=FALSE)
+
+for (i in 1:nrow(overlapping_positions)){
+  
+ # input_fasta[overlapping_positions[i,3],2] =  paste(substr(input_fasta[overlapping_positions[i,3],2],1,min(overlapping_positions[i,1:2])), substr(input_fasta[overlapping_positions[i,3],2],max(overlapping_positions[i,1:2]),length(input_fasta[overlapping_positions[i,3],2])),sep="")
+  
+  input_fasta[overlapping_positions[i,10],2] =  paste(substr(input_fasta[overlapping_positions[i,10],2],1, min(overlapping_positions[i,1:2])), str_replace(input_fasta[overlapping_positions[i,10],2],max(overlapping_positions[i,1:2]),length(input_fasta[overlapping_positions[i,10],2])),sep="")
+  
+  substr(input_fasta[overlapping_positions[i,10],2], ) = ""
+                                  
+}
+
+filtered_fasta = input_fasta %>% filter(nchar(seq.text) > 100)
+
+filtered_fasta$seq.name = paste(">", genome,"_", filtered_fasta$seq.name, sep="")
+
+write.table(filtered_fasta, paste("D:/Analysis_Output/Nucmer/10Ecotype_", genome, "_UnalignedSequences.fasta", sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+
+
+```
+
+
+
+#Get length of each chromosome/contig and output them
+```{r}
+
+library(phylotools)
+library(dplyr)
+library(stringr)
+
+
+for (file in list.files("D:/Analysis_Output/Nucmer/Input_Genomes_forsanity", pattern="*.fasta", full.names = TRUE)) {
+  input_fasta = read.fasta(file)
+  
+  genome_name = gsub("\\..*$","", basename(file))
+  
+  chromosome_lengths = matrix(ncol=2, nrow=nrow(input_fasta))
+  chromosome_lengths[,1] = input_fasta$seq.name
+  
+  for (i in 1:nrow(input_fasta)){
+    
+    chromosome_lengths[i,2] = nchar(input_fasta[i,2])
+      
+  }
+  
+  write.table(chromosome_lengths, paste("D:/Analysis_Output/Nucmer/Input_Genomes_forsanity/", genome_name, "contig_lengths.txt", sep=""), quote=FALSE, col.names=FALSE, row.names=FALSE, sep="\t") 
+  
+}
+
+
+
+
+
+
+```
+
+
+##Take input bed file and pull out sequences from genome
+```{r}
+
+library(phylotools)
+library(dplyr)
+library(stringr)
+library(IRanges)
+
+genome = "An1_Col_Test"
+
+input_fasta = read.fasta("D:/Analysis_Output/Nucmer/Input_Genomes_forsanity/An-1.chr.all.v2.0.fasta")
+input_fasta = read.fasta("D:/Analysis_Output/Nucmer/Input_Genomes_forsanity/Col.Athaliana_447_TAIR10.fasta")
+row.names(input_fasta) = input_fasta$seq.name
+
+overlapping_positions = read.table("D:/Analysis_Output/Nucmer/10_Ecotype_Nucmer.coords", header=FALSE)
+overlapping_positions = overlapping_positions %>% filter(V5 > 250)
+
+thing=matrix(nrow=nrow(overlapping_positions))
+for (j in 2:nrow(overlapping_positions)){
+  
+  #print(j)
+  
+  if((overlapping_positions[j,1] - overlapping_positions[j-1,2]) < 100)
+  {
+    #print("Yes")
+    thing[j,1] = "TRUE"
+  }
+  else
+  {
+    #print("No")
+    thing[j,1] = "FALSE"
+  }
+  
+}
+
+overlapping_positions = cbind(overlapping_positions, thing)
+
+test_positions = overlapping_positions %>% filter(V5 > 10000)
+
+#overlapping_groups = overlapping_positions %>% filter(V10==test_positions[1,10] & )
+
+#overlapsRef = split(IRanges(start=overlapping_positions$V1, stop=overlapping_positions$V2), overlapping_positions$V10)
+
+#overlapping_positions = read.table("D:/Analysis_Output/Nucmer/8Ecotype_Paper/Col_An1_C24_Cvi_Eri_KBSmac74_Kyo_Ler_Nd1_Sha_Nucmer_coordinateslist.txt", header=FALSE)
+
+for (i in 1:nrow(overlapping_positions)){
+  
+ # input_fasta[overlapping_positions[i,3],2] =  paste(substr(input_fasta[overlapping_positions[i,3],2],1,min(overlapping_positions[i,1:2])), substr(input_fasta[overlapping_positions[i,3],2],max(overlapping_positions[i,1:2]),length(input_fasta[overlapping_positions[i,3],2])),sep="")
+  
+  input_fasta[overlapping_positions[i,10],2] =  paste(substr(input_fasta[overlapping_positions[i,10],2],1, min(overlapping_positions[i,1:2])), str_replace(input_fasta[overlapping_positions[i,10],2],max(overlapping_positions[i,1:2]),length(input_fasta[overlapping_positions[i,10],2])),sep="")
+  
+  substr(input_fasta[overlapping_positions[i,10],2], ) = ""
+                                  
+}
+
+filtered_fasta = input_fasta %>% filter(nchar(seq.text) > 100)
+
+filtered_fasta$seq.name = paste(">", genome,"_", filtered_fasta$seq.name, sep="")
+
+write.table(filtered_fasta, paste("D:/Analysis_Output/Nucmer/10Ecotype_", genome, "_UnalignedSequences.fasta", sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+
+
+```
+
+##Genome comparison Nucmer parsing
+
+```{r}
+
+library(phylotools)
+library(dplyr)
+library(stringr)
+
+input_comparison = read.table("D:/Analysis_Output/Nucmer/Compare_gene_models/An1_Col_Nucmer_GeneModelTest.filtered.coords", header=FALSE)
+
+
+###########reference
+
+duplicate_reference = input_comparison[duplicated(input_comparison$V10),]
+duplicate_query = input_comparison[duplicated(input_comparison$V11),]
+sorted = duplicates[order(duplicate_reference[,10]),]
+
+
+
+unique_duplicated_reference = unique(duplicate_reference$V10)
+unique_duplicated_query = unique(duplicate_query$V11)
+
+duplicated_reference = input_comparison %>% filter(V10 %in% unique_duplicated_reference)
+not_duplicated = input_comparison %>% filter(!(V10 %in% unique_duplicated_reference))
+split_matches = input_comparison %>% filter((V10 %in% unique_duplicated_reference) & (V11 %in% unique_duplicated_query))
+
+ordered_split_matches = split_matches[order(split_matches[,10]),]
+
+reference_parsed = data.frame()
+possible_cnvs = data.frame()
+split_matches = data.frame()
+for (i in 1:length(unique_duplicated_reference)){
+  
+  intermediate_duplicate_gene = input_comparison %>% filter(V10 %in% unique_duplicated_reference[i])
+  duplicated_query_interim = unique(intermediate_duplicate_gene[duplicated(intermediate_duplicate_gene$V11),])
+  
+   if (nrow(duplicated_query_interim) > 0)
+  {
+      
+     #print("IF statement true")
+    split_matches = rbind(split_matches, intermediate_duplicate_gene %>% filter(V11 %in% duplicated_query_interim))
+     
+    intermediate_remaining_matches = intermediate_duplicate_gene %>% filter(!(V11 %in% duplicated_query_interim))
+    
+   
+    if (nrow(intermediate_remaining_matches) > 0){
+      
+      #print("HERE")
+    reference_parsed = rbind(reference_parsed,intermediate_remaining_matches[which.max(intermediate_remaining_matches$V6),])
+
+    removed_matched = intermediate_remaining_matches[-c(which.max(intermediate_remaining_matches$V6)),]
+  
+  
+    possible_cnvs = rbind(possible_cnvs, removed_matched)
+     }
+    
+   } else {
+    
+    #print("ELSE")
+    reference_parsed = rbind(reference_parsed,intermediate_duplicate_gene[which.max(intermediate_duplicate_gene$V6),])
+  
+    removed_matched = intermediate_duplicate_gene[-c(which.max(intermediate_duplicate_gene$V6)),]
+  
+  
+    possible_cnvs = rbind(possible_cnvs, removed_matched)
+  
+  
+   }
+  
+}
+
+
+matched_in_reference = rbind(not_duplicated,reference_parsed)
+#possibleCNV =  %>% 
+duplicated_query_reference = reference_parsed[duplicated(reference_parsed$v11,)]
+
+
+possible_cnv_testing = input_comparison %>% filter(V11 %in% possible_cnvs$V11)
+
+
+##############################query 
+duplicates = input_comparison[duplicated(input_comparison$V11),]
+sorted = duplicates[order(duplicates[,11]),]
+
+unique_duplicated_query = unique(duplicates$V11)
+
+duplicated_query = input_comparison %>% filter(V11 %in% unique_duplicated_query)
+
+query_parsed = data.frame()
+for (i in 1:length(unique_duplicated_query)){
+  
+  intermediate_duplicate_gene = input_comparison %>% filter(V11 %in% unique_duplicated_query[i])
+  query_parsed = rbind(query_parsed,intermediate_duplicate_gene[which.max(intermediate_duplicate_gene$V6),])
+  
+  
+}
+
+not_duplicated = input_comparison[!duplicated(input_comparison$V10),]
+
+test = intersect(duplicates$v10, not_duplicated$v10)
+
+```
+
+
+```{r}
+
+
+
+library(phylotools)
+library(dplyr)
+
+
+barcode_str="barcode10"
+fasta_in=paste("D:/Analysis_Output/GenePrediction_Output/Augustus/Ecotypes/10Ecotypes/", barcode_str, "_geneprediction.fasta", sep="")
+augustus_fasta_names=paste("D:/Analysis_Output/GenePrediction_Output/Augustus/Ecotypes/10Ecotypes/", barcode_str, "/", barcode_str, "_LRR_RKs.txt", sep="")
+
+input_fasta = read.fasta(fasta_in)
+
+#fasta_names = read.csv("D:/Sequence_Data/Phylogenetics_Project/2023_Sep19_LRRI.1_Names.csv", header=FALSE)
+
+fasta_names = read.table(augustus_fasta_names, header=FALSE)
+
+
+filtered_fasta = input_fasta %>% filter(seq.name %in% fasta_names$V1)
+
+#for (i in 1:nrow(input_fasta)){
+  
+#  output_fasta = input_fasta[i,]
+  
+#  output_name = output_fasta[1,1]
+output_fasta = filtered_fasta
+output_fasta$seq.name = paste(">", output_fasta$seq.name, sep="")
+
+
+
+  
+write.table(output_fasta, paste(fasta_in, "LRR_RKs.fasta"), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+
+#write.table(output_fasta$seq.name, "D:/Sequence_Data/Phylogenetics_Project/2023_Sep19_LRRI.1_Proteins.names.txt", col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+  
+
+
+
+
+```
+
+
+###Count occurences of species families
+
+```{r}
+
+library(dplyr)
+
+LRR_Counts = read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/Predict_PhytoLRR/Apr6_2021_Species_LRR_Family_Counts.csv")
+
+order_list = read.csv("D:/Sequence_Data/Phylogenetics_Project/2021_Aug_Colours_list_for_tree.csv", header=FALSE)
+order_list = order_list[,1:5]
+
+orders = c("Malpighiales", "Brassicales", "Sapindales", "Malvaceae","Other", "Bryophytes", "Caryophyllales", "Rosaceae", "Fabaceae", 
+"Poales",
+"Chlorophyta")
+
+counts_by_family = matrix(ncol=ncol(LRR_Counts), nrow=length(orders))
+counts_by_family[,1] = orders
+colnames(counts_by_family) = colnames(LRR_Counts)
+
+for (i in 1:nrow(counts_by_family)){
+  
+  temp_order_list = order_list %>% filter(V5 %in% orders[i])
+  temp_order_counts = LRR_Counts %>% filter(Species %in% temp_order_list$V2)
+  
+  for (j in 2:ncol(counts_by_family)){
+    
+    counts_by_family[i,j] = sum(temp_order_counts[,j])
+    
+    
+  }
+  
+  write.csv(counts_by_family, "D:/Sequence_Data/Phylogenetics_Project/Clustering/Predict_PhytoLRR/2022_May16th_LRRCounts_SplitByOrder.csv")
+}
+
+```
+
+
+###get contig counts and length
+
+```{r}
+library(phylotools)
+library(dplyr)
+
+
+#fasta_file = "D:/Sequence_Data/Ecotype_DataFiles/Genome_Files/10Ecotypes/file1.Col-PEK1.5_Chr1-5_20220523.fasta"
+fasta_file = "D:/Analysis_Output/RagTag/barcode06/barcode06_flye_ColPek_ColCen/ragtag.scaffold.fasta"
+#fasta_file = "D:/Sequence_Data/Ecotype_DataFiles/Genome_Files/10Ecotypes/barcode10_flye_scaffolded_pilonpolish3.fasta"
+input_fasta = read.fasta(fasta_file)
+
+chrm_matrix = matrix(ncol=2,nrow=nrow(input_fasta))
+chrm_matrix[,1] = input_fasta$seq.name
+
+for (i in 1:nrow(input_fasta)){
+  
+  chrm_matrix[i,2] = nchar(input_fasta[i,2])
+  
+  
+}
+
+write.csv(chrm_matrix, paste(fasta_file,"chromosome_info.csv", sep=""))
+
+
+```
+
+###Split chromosome files by major chromosomes
+```{r}
+
+library(phylotools)
+library(dplyr)
+
+fasta_dir = "D:/Sequence_Data/Ecotype_DataFiles/Genome_Files/10Ecotypes/"
+output_dir = "D:/Sequence_Data/Ecotype_DataFiles/Genome_Files/10Ecotypes/SplitbyChrm/"
+  
+fastas_list=list.files(fasta_dir, pattern="*.fasta$")
+
+chrm_list = c("chr1", "chr2", "chr3", "chr4", "chr5")
+
+
+
+for (i in 1:length(fastas_list)){ 
+  
+  #need to get names of the somatic chromosomes that are going to be output so we can filter them away for the 'extra' contigs
+  somatic_chrm_list=vector()
+
+  fasta_name=paste(fasta_dir, fastas_list[i], sep="")
+
+  fasta_in = read.fasta(fasta_name)
+
+  
+
+  for (chromosome in chrm_list) {
+  
+    #grep(chrm_list, fasta_in$seq.name)
+  
+    sequence_to_output = fasta_in[grep(chromosome, fasta_in$seq.name, ignore.case="TRUE"),]
+    
+    #update the vector containing the chromosome names. Have to do it here becfore adding the >
+    somatic_chrm_list=c(somatic_chrm_list, sequence_to_output$seq.name)
+    
+    sequence_to_output$seq.name = paste(">", sequence_to_output$seq.name, sep="")
+  
+    write.table(sequence_to_output, paste(output_dir, fastas_list[i], "_", chromosome, ".fasta", sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+    
+    
+  
+    
+  }
+  
+  #output extra seqs
+  sequence_to_output = fasta_in %>% filter(!(seq.name %in% somatic_chrm_list))
+    
+  sequence_to_output$seq.name = paste(">", sequence_to_output$seq.name, sep="")
+  
+  write.table(sequence_to_output, paste(output_dir, fastas_list[i], "_extra.fasta", sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+}
+
+
+
+
+
+
+
+```
+
+
+##prepare for phylomcl 
+
+```{r}
+
+library(phylotools)
+library(dplyr)
+library(stringr)
+library(TreeTools)
+
+fasta_dir="D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/OG_Refinement/"
+
+OG_dirs=list.dirs(fasta_dir, recursive=FALSE)
+
+fasta_files=list.files(fasta_dir, pattern="*.fasta")
+
+species_tree = read.tree("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Oct01/Species_Tree/SpeciesTree_rooted.txt")
+
+species_tree=collapse.singles(species_tree)
+
+
+for (i in 1:length(fasta_files)){
+  
+  OG_fastas=read.fasta(paste(fasta_dir,fasta_files[i],sep=""))
+  
+  gene_lengths=nchar(OG_fastas$seq.text)
+  
+  Species_names = gsub("\\|.*","",OG_fastas$seq.name)  #this isn't a unique list, it's just grabbing an ordered vector of hte different species 
+  
+  gene_to_length_map=data.frame(cbind(OG_fastas$seq.name,gene_lengths))
+  
+  gene_to_species_map=data.frame(cbind(OG_fastas$seq.name, Species_names ))
+  
+  write.table(gene_to_length_map, paste(fasta_dir, fasta_files[i], "_gene2length.map",sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  
+  write.table(gene_to_species_map, paste(fasta_dir, fasta_files[i], "_species2gene.map",sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  
+  
+  
+  #now we prune the species tree to use in phylomcl
+  pruned_tree=drop.tip(species_tree, species_tree$tip.label[-match(Species_names,species_tree$tip.label)], collapse.singles=TRUE)
+  
+  pruned_tree=collapse.singles(pruned_tree, root.edge=FALSE)
+  
+  #pruned_tree = keep.tip(species_tree, Species_names)
+  
+  #MakeTreeBinary()
+  
+  write.tree(pruned_tree, paste(fasta_dir, fasta_files[i], "_speciestree.nwk",sep=""))
+  
+  gene_tree=read.tree("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/OG_Refinement/OG0000000_N0.HOG0000001/OG0000000_N0.HOG0000001_tree.nwk")
+  
+  treetest=speciesTree(gene_tree, FUN  = min)
+
+}
+
+
+```
+
+
+
+

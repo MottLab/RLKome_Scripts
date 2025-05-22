@@ -1,0 +1,301 @@
+---
+title: "Presence_absence_variation"
+output: html_document
+---
+
+
+```{r}
+
+require(micropan)
+require(ggplot2)
+require(tidyr)
+require(vegan)
+library(pagoo)
+
+folder = "D:/Analysis_Output/Coverage_test_stuff/Ecotype_Kinase_Coverage/"
+folder = "D:/Analysis_Output/Coverage_test_stuff/Ecotype_NLR_Coverage/"
+gene_family = "NLR"
+
+files = list.files(folder, pattern="*raw.txt", full.names=TRUE)
+
+
+#initial_file_stuff = read.table(files[1], header=TRUE)
+
+ coverage_table = unique(read.table(files[1], header=TRUE))
+  
+for (j in 1:nrow(coverage_table)){
+    
+    coverage_table[j,4][coverage_table[j,4] > 100] = coverage_table[j,4] / 2
+  }
+
+coverage_matrix = matrix(nrow=(nrow(coverage_table)),ncol=1)
+
+for (i in 2:(length(files))){
+  
+  print(i)
+  
+  coverage_table = unique(read.table(files[i], header=TRUE))
+  
+  for (j in 1:nrow(coverage_table)){
+    
+    coverage_table[j,4][coverage_table[j,4] > 100] = coverage_table[j,4] / 2
+  }
+  
+  
+  coverage_matrix = cbind(coverage_matrix,coverage_table$Percent_breadth_of_coverage)
+  
+  
+}
+
+rownames(coverage_matrix) = coverage_table$Gene_name
+
+coverage_matrix = coverage_matrix[,-1]
+
+
+
+filtered_list = read.csv("D:/Analysis_Output/Coverage_test_stuff/Ecotype_Kinase_Coverage/RK_list.csv")
+
+coverage_matrix_analysis = as.data.frame(coverage_matrix)
+
+#if (gene_family != "NLR"){
+ # coverage_matrix_analysis= coverage_matrix_analysis[rownames(coverage_matrix_analysis) %in% filtered_list[[gene_family]],]
+#}
+
+
+filter_cutoff = 80
+coverage_matrix_analysis[coverage_matrix_analysis<filter_cutoff] = 0
+coverage_matrix_analysis[coverage_matrix_analysis>=filter_cutoff] = 1
+
+#write.csv(coverage_matrix_analysis, paste(folder, "/63_Ecotype_Presence_absence_matrix_",filter_cutoff,"pct.csv", sep=""))
+gene_frequency = as.data.frame(rowMeans(coverage_matrix_analysis)*100)
+gene_frequency = cbind(rownames(coverage_matrix_analysis),gene_frequency[,1])
+gene_frequency[,2] = as.numeric(gene_frequency[,2])
+
+#core_genes = gene_frequency[gene_frequency[,2] >= 90,] +
+#shell_genes = gene_frequency[gene_frequency[,2] < 90 & gene_frequency[,2]>20,] +
+#cloud_gene = gene_frequency[gene_frequency[,2] < 20, ]
+
+
+
+pangenome_list = list(as.data.frame(gene_frequency[as.numeric(gene_frequency[,2]) >= 90,]), as.data.frame(gene_frequency[as.numeric(gene_frequency[,2]) < 90 & as.numeric(gene_frequency[,2])>=20,]), as.data.frame(gene_frequency[as.numeric(gene_frequency[,2]) < 20, ]))
+names(pangenome_list) = c("Core", "Shell", "Cloud")
+
+pangenome_dataframe = data.frame(pangenome_list$Core$V1, pangenome_list$Shell$V1, pangenome_list$Cloud$V1, pangenome_list$Core$V2, pangenome_list$Shell$V2, pangenome_list$Cloud$V2, c(replicate(length(pangenome_list$Core$V1), "Core"), replicate(length(pangenome_list$Shell$V1), "Shell"), replicate(length(pangenome_list$Cloud$V1), "Cloud")))
+
+pangenome_RKs = pangenome_dataframe
+pangenome_RKs$Family = gene_family
+colnames(pangenome_RKs) = c("Gene", "Frequency", "Division", "Family")
+
+split_rk_df=data.frame()
+for (i in 1:ncol(filtered_list)){
+  
+  gene_family = colnames(filtered_list[i])
+  temp_df = pangenome_RKs %>% filter(Gene %in% filtered_list[[gene_family]])
+  temp_df$Family = gene_family
+  
+  split_rk_df = rbind(split_rk_df, temp_df)
+    
+}
+
+pangenome_dataframe$Family = gene_family
+colnames(pangenome_dataframe) = c("Gene", "Frequency", "Division", "Family")
+
+#combines any specific entries, such as NLRs, and the RKs into one dataframe
+pangenome_dataframe_all = rbind(split_rk_df, pangenome_dataframe)
+
+pangenome_dataframe_all = pangenome_dataframe_all %>% filter(!(Family == "LRR.I" | Family == "LRR")) 
+
+####Use this section to plot the violin plo of ogst####
+level_order = c("All_RKs", "NLR", "RLPs", "CR4L", "CRK", "CrRLK1L", "Extensin", "LecRK", "LRK10L", "LYK", "PERKL", "PR5L", "RKF3L", "RLCK", "SRK", "URK", "WAK", "MLRR", "Non.MLRR")
+pangenome_dataframe_all %>% ggplot(aes(x=factor(Family, level=level_order), y=as.integer(Frequency))) + geom_violin() + geom_jitter(height=0.5, width=0.15, size = 0.15, aes(colour = factor(Division))) + scale_colour_manual(name="colour", values=c("blue","black","orange")) + theme_light() + theme(axis.text.x = element_text(angle = 45, vjust=1, hjust=1)) + xlab("Receptor Family") + ylab("Gene Cluster Frequency")
+
+
+ggsave(paste("D:/Analysis_Output/Plots/GeneCoverageCurves/2022_Violin_OGs_All_", filter_cutoff,".png",sep=""), height=4, width=10, dpi=600)
+
+
+#coverage_matrix_analysis = as.matrix(as.numeric(coverage_matrix_analysis))
+heatmap_matrix = matrix(as.numeric(coverage_matrix_analysis[1:617, 1:54]), ncol=ncol(coverage_matrix_analysis))
+heatmap_matrix = sapply(heatmap_matrix, as.numeric)
+
+rownames(heatmap_matrix) = rownames(coverage_matrix_analysis)
+
+heatmap_matrix=t(heatmap_matrix)
+heatmap = heatmap(heatmap_matrix, col=c("white","blue"), scale="row", cexRow=0.001, cexCol = 0.001, margin = c(1, 5), lhei=c(0.5,5))
+
+#pangenome_list = list(gene_frequency[gene_frequency[,1] >= 90,1], gene_frequency[gene_frequency[,1] < 90 & gene_frequency[,1] >= 20,1], gene_frequency[gene_frequency[,1] < 20,1])
+
+
+
+
+
+panmatrix_stuff = panMatrix(coverage_matrix_analysis)
+#transpose matrix to make rarefaction curve
+panmatrix_prepped = t(coverage_matrix_analysis)
+#make rarefaction curve with n permutations
+rare_curve = rarefaction(panmatrix_prepped, n.perm = 100)  
+
+
+#####################Graphing ####################
+
+#get histogram with number of genoems found
+
+
+pagoo_thingy = pagoo(panmatrix_prepped)
+panmatrix_prepped$pan_pca()
+
+
+png(paste("D:/Analysis_Output/Plots/GeneCoverageCurves/2022_Histogram_", gene_family, "_", filter_cutoff,".png",sep=""))
+tibble(Clusters = as.integer(table(factor(colSums(panmatrix_prepped > 0),
+                                          levels = 1:nrow(panmatrix_prepped)))),
+      Genomes = 1:nrow(panmatrix_prepped)) %>% 
+ggplot(aes(x = Genomes, y = Clusters)) +
+geom_col() + labs(title = "Number of clusters found in 1, 2,...,all genomes")
+dev.off()
+
+
+
+#plot rarefaction as is without trendline
+rare_curve %>% gather(key = "Permutation", value = "Clusters", -Genome) %>% ggplot(aes(x = Genome, y = Clusters, group = Permutation)) +geom_line() + geom_hline(yintercept=max(rare_curve$Perm1),col="red", lwd=1)
+
+#plot rarefaction without trendline
+rare_curve %>% gather(key = "Permutation", value = "Clusters", -Genome) %>% ggplot(aes(x = Genome, y = Clusters, group = Permutation)) +geom_point()
+
+rare_curve %>% gather(key = "Permutation", value = "Clusters", -Genome) %>% ggplot(aes(y = Clusters, group = Genome)) +geom_point()
+
+curve_df = rare_curve %>% gather(key = "Permutation", value = "Clusters", -Genome)
+
+avg_curve = rare_curve[,1:2]
+
+for (i in nrow(curve)){
+  avg_curve[i,2] = mean(as.numeric(curve[i,2:ncol(curve)]))
+}
+
+
+
+curve_df = rare_curve %>% gather(key = "Permutation", value = "Clusters", -Genome)
+
+#gather permutation clusters into one column
+curve_for_plotting = rare_curve %>% gather(key = "Permutation", value = "Clusters", -Genome)
+curve_df %>% ggplot(aes( x=as.factor(Genome), y=Clusters)) + geom_boxplot() +scale_x_discrete(guide = guide_axis(check.overlap=TRUE))
+
+#format data to use in log regression fit
+curve_for_model = curve_for_plotting[curve_for_plotting[,1] != 0,]
+
+max_clusters = max(curve_for_model$Clusters)
+min_clusters = min(curve_for_model$Clusters)
+
+curve_for_model$max_clusters = max_clusters
+
+#fit rarefaction usign a logarithmic curve
+fit = lm(Clusters ~ log(Genome), data=curve_for_model)
+fit = lm(Clusters ~ exp(-1*Genome), data=curve_for_model)
+fit = lm(formula=Clusters ~ max_clusters-(1-exp(-1*Genome)),data=curve_for_model)
+fit = nls(Clusters ~ a*b*exp(Genome), start=list(a=max_clusters, b=min_clusters), data=curve_for_model)
+
+nls_fit = nls(Clusters ~ max_clusters-(1-exp(-1*Genome)), data=curve_for_model)
+
+
+
+#get regression x values
+regression_x = seq(from=1, to=max(curve_for_model$Genome), length.out=1000)
+#get regression y values
+predicted_y = predict(fit, newdata=list(Genome=seq(from=1, to=max(curve_for_model$Genome), length.out=1000)), interval="confidence")
+
+regression_y = predicted_y[,1] - (max(curve_for_model$Clusters) )
+
+png(paste("D:/Analysis_Output/Plots/GeneCoverageCurves/2022_Rarefaction_", gene_family, "_", filter_cutoff,".png",sep=""))
+plot(curve_for_plotting$Genome, curve_for_plotting$Clusters, xlab="Genomes", ylab="Gene_Clusters") + lines(regression_x, regression_y$Perm1, lwd = 2, col = "red")
+dev.off()
+#plot rarefaction curve with trendline
+
+rarefy()
+
+#creates a binomial mixture model to predict occurrence of core genes and total pangenome size if ALL genomes are sequenced
+fitted = binomixEstimate(coverage_matrix_analysis, K.range = 2:8)
+
+
+ncomp <- 3 #THIS NEEDS TO BE CHANGED DEPENDING ON FITTED! Number of components. This is equivalent to the K value from the binomial mixture model
+fig4 <- fitted$Mix.tbl %>% 
+  filter(Components == ncomp) %>% 
+  ggplot() +
+  geom_col(aes(x = "", y = Mixing.proportion, fill = Detection.prob)) +
+  coord_polar(theta = "y") +
+  labs(x = "", y = "", title = "Pan-genome gene family distribution",
+       fill = "Detection\nprobability") +
+  scale_fill_gradientn(colors = c("pink", "orange", "green", "cyan", "blue"))
+print(fig4)
+
+
+#rare_curve %>% gather(key = "Permutation", value = "Clusters", -Genome) %>% ggplot(aes(x = Genome, y = Clusters, group = Permutation)) +geom_point() +geom_line(aes(x = Genome, y=y_for_regression, col="red"))
+
+
+#plot(point_curve)
+
+
+
+#Plot the average rarefaction curve
+#avg_curve_plot = avg_curve %>% gather(key = "Permutation", value = "Clusters", -Genome) %>% ggplot(aes(x = Genome, y = Clusters, group = Permutation)) +geom_point() +geom_line(aes(x=avg_curve$Genome, y=y_for_regression, col="red"))
+
+#plot average permutation dots and lines with saturation line present
+avg_curve_plot = avg_curve %>% gather(key = "Permutation", value = "Clusters", -Genome) %>% ggplot(aes(x = Genome, y = Clusters, group = Permutation)) +geom_point() + geom_line() +geom_hline(yintercept=max(rare_curve$Perm1),col="red", lwd=1)
+
+avg_curve %>% gather(key = "Permutation", value = "Clusters", -Genome) %>% ggplot(aes(x = Genome, y = Clusters, group = Permutation)) +geom_point() + geom_line() +geom_hline(yintercept=max(rare_curve$Perm1),col="red", lwd=1)
+
+png(paste("D:/Analysis_Output/Plots/GeneCoverageCurves/2022_", gene_family, "_", filter_cutoff,".png",sep=""))
+plot(avg_curve_plot)
+dev.off()
+
+avg_curve_df = avg_curve %>% gather(key = "Permutation", value = "Clusters", -Genome)
+
+#genomes2 = avg_curve$Genome ** 2
+avg_curve = avg_curve[-1,]
+#x_for_model = log(avg_curve$Genome)
+model_fixed = lm(avg_curve$Perm1~(617*exp(-0.4*Genome)), data=avg_curve)
+
+
+y_for_model = 611-(x_for_model * avg_curve$Perm1)
+#xx = seq(min(avg_curve$Perm1), max(avg_curve$Perm1, len=54))
+
+#xx = -xx
+#yy = model_fixed$coefficients %*% rbind(1, xx, xx * xx)
+#yy = model_fixed$coefficients %*% rbind(5.937729 + 0.012397*xx)
+
+#xx = c(0, xx)
+
+#length_values = seq(0, max(avg_curve$Genome),0.1)
+curve.stuff = exp(predict(model_fixed,list(Genome=avg_curve$Genome)))
+
+
+t = 1:54
+a = max(avg_curve$Perm1)
+r = -0.55
+y = a*exp(r*t)
+
+y_for_regression = max(avg_curve$Perm1)-y
+
+avg_curve %>% gather(key = "Permutation", value = "Clusters", -Genome) %>% ggplot(aes(x = Genome, y = Clusters, group = Permutation)) +geom_point() +geom_line(aes(x=c(avg_curve$Genome), y=c(0,y_for_regression), col="red"))
+
+
+plot(avg_curve_df$Clusters ~ avg_curve_df$Genome) + lines(c(0, avg_curve$Genome), c(0,y_for_regression), lwd = 2, col = "red")
+
+#abline(avg_curve_plot)
+
+
+#lines(xx, yy, lwd = 2, col = "red")
+
+
+#creates a binomial mixture model to predict occurrence of core genes and total pangenome size if ALL genomes are sequenced
+fitted = binomixEstimate(panmatrix_prepped, K.range = 2:8)
+
+
+
+
+```
+
+
+```{r}
+
+{plot(avg_curve_plot)
+lines(xx, yy, lwd = 2, col = "red")}
+```
+

@@ -1,0 +1,298 @@
+---
+title: "Tree_Manipulation"
+output: html_document
+---
+
+```{r}
+
+library(treeman)
+
+tree = readTree("D:/Sequence_Data/Phylogenetics_Project/Expansion_Reconciliation_Analysis/species_tree_5lettercodes.nwk")
+
+ultrametricTree = ultrTree(tree)
+
+writeTree(ultrametricTree, "D:/Sequence_Data/Phylogenetics_Project/Expansion_Reconciliation_Analysis/species_tree_UltrametricTree_5lettercodes.nwk" )
+
+```
+
+
+
+##Ape check
+```{r}
+
+library(ape)
+library(RCurl)
+library(stringr)
+library(dplyr)
+library(tidyr)
+
+
+
+ape_tree = ape::read.tree("D:/Sequence_Data/Phylogenetics_Project/Expansion_Reconciliation_Analysis/species_tree_5lettercodes.nwk")
+
+is.ultrametric(ape_tree)
+is.rooted(ape_tree)
+is.binary(ape_tree)
+
+#ultrametricTree = ultrTree(tree)
+
+#writeTree(ultrametricTree, "D:/Sequence_Data/Phylogenetics_Project/Expansion_Reconciliation_Analysis/species_tree_UltrametricTree_5lettercodes.nwk" )
+
+
+
+
+#input_tree = ape::read.tree("D:/Sequence_Data/Phylogenetics_Project/Trees/Unrooted/2021_July11_I.1_113Species_Kinase_LRRs_CESAOutgroup_MAFFTAlign.fasta.treefile")
+#input_tree = ape::read.tree("D:/Sequence_Data/Phylogenetics_Project/2023_September_FinalFilesForPaper/2023_Sep22_StartFromOldTree_LRRI.1_Human_Arath_Outgroups_CladeColoursITOL_tree.nwk")
+
+ 
+#input_tree = read.tree("D:/Sequence_Data/Phylogenetics_Project/2023_September_FinalFilesForPaper/2023_Sep19_started_from_old_tree_LRRI.1_Human_arath_outgroups_aligned.fasta_fromstartingtree.treefile")
+input_tree = read.tree("D:/Sequence_Data/Phylogenetics_Project/2023_September_FinalFilesForPaper/2023_LRRI.1_Human_arath_outgroups_phylogeny.nwk")
+
+#input_tree=root.phylo(input_tree, 'sp_Q94JQ6_CESA6_ARATH', resolve.root=TRUE)
+
+is.rooted(input_tree)
+
+#unroot tree if needed
+unrooted_tree = unroot(input_tree)
+
+#write tree if wanted to nwk
+write.tree(unrooted_tree, file="D:/Sequence_Data/Phylogenetics_Project/2023_September_FinalFilesForPaper/2023_LRRI.1_Human_arath_outgroups_phylogeny_UNROOTED.nwk")
+
+#tipcol = rep('black', length(input_tree$tip.label))
+tiplabels = as.data.frame(cbind(input_tree$tip.label, substr(input_tree$tip.label,1,5)))
+input_colours = read.csv("D:/Sequence_Data/Phylogenetics_Project/2021_Aug_Colours_list_for_tree.csv", header=FALSE)
+colnames(input_colours) = c("Reduced Name", "ID", "Genus", "Species", "Class", "Colour")
+
+#specific_group = read.csv("D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/Family_I.1/GDPC_Containing.csv", header=FALSE)
+#specific_group = cbind(specific_group, "Red")
+#colnames(specific_group) = c("ID", "Colour")
+
+#other_groups = tiplabels %>% filter(!(ID %in% specific_group$ID))
+#other_groups$Species = "Blue"
+#colnames(other_groups) = c("ID", "Colour")
+
+#plot_specific = rbind(specific_group, other_groups)
+
+#for overall
+colnames(tiplabels) = c("Sequence Name", "ID")
+
+#for specific groups
+#colnames(tiplabels) = c("ID", "Species")
+
+#colour_scheme = merge(tiplabels, input_colours, by(tiplabels$V2))
+
+colour_scheme = left_join(tiplabels, input_colours[,1:6], by='ID')
+#For specific groups
+#colour_scheme = left_join(tiplabels, plot_specific, by='ID')
+
+
+
+png("D:/Sequence_Data/Phylogenetics_Project/Pictures/Sep2023_LRRI.1_unrooted.png", width=5000, height=5000)
+  plot(input_tree, "unrooted", use.edge.length=FALSE, show.tip.label = TRUE, edge.color="black", tip.color=colour_scheme$Colour, cex=1)
+dev.off()
+
+
+
+```
+
+#shiftplot section
+
+```{r}
+
+library(shiftPlot)
+
+
+
+
+input_tree = read.tree("D:/Sequence_Data/Phylogenetics_Project/Aligned_FASTAs/2021_Nov24_MultipleOutgroupLRRI/2021_Nov24_LRRI_Aligned_MultipleOutgroups.fasta.treefile.nwk")
+input_tree=root.phylo(input_tree, 'sp_Q94JQ6_CESA6_ARATH', resolve.root=TRUE)
+
+test = optimalCollapse(input_tree,state.)
+
+
+
+```
+
+
+
+
+###Take input phylogenetic information and parse for counts
+```{r}
+
+```
+
+
+#force ultrametric using code from http://blog.phytools.org/2017/03/forceultrametric-method-for-ultrametric.html
+```{r}
+
+library(phangorn)
+library(ape)
+
+
+force.ultrametric<-function(tree,method=c("nnls","extend")){
+    method<-method[1]
+    if(method=="nnls") tree<-nnls.tree(cophenetic(tree),tree,
+        rooted=TRUE,trace=0)
+    else if(method=="extend"){
+        h<-diag(vcv(tree))
+        d<-max(h)-h
+        ii<-sapply(1:Ntip(tree),function(x,y) which(y==x),
+            y=tree$edge[,2])
+        tree$edge.length[ii]<-tree$edge.length[ii]+d
+    } else 
+        cat("method not recognized: returning input tree\n\n")
+    tree
+}
+
+
+```
+
+
+
+####make tanglegram
+
+```{r}
+library(ape)
+library(dendextend)
+library(phangorn)
+library(DECIPHER)
+library(ggplot2)
+
+tree1 = read.tree("D:/Sequence_Data/Phylogenetics_Project/Trees/Unrooted/LRK10Ls/2022_Aug31_LRK10Ls_24Species_ECD_CESAOutgroup_mafftAlign.fasta.treefile")
+
+tree2 = read.tree("D:/Sequence_Data/Phylogenetics_Project/Trees/Unrooted/LRK10Ls/2022_Aug_predictedLRK10Ls_24Species_KinaseOnly_SequenceHasECD_CESAOutgroup_mafftaligned.fasta.nwk")
+
+#use this if your tree isn't rooted
+rooted_dend1 = root.phylo(tree1, 'sp_Q94JQ6_CESA6_ARATH', resolve.root=TRUE)
+rooted_dend2 = root.phylo(tree2, 'sp_Q94JQ6_CESA6_ARATH', resolve.root=TRUE)
+
+ctrl = chronos.control(nb.rate.cat=1)
+dend1_clock = chronos(rooted_dend1)
+dend2_clock = chronos(rooted_dend2)
+
+#ultrametric_dend1 = force.ultrametric(rooted_dend1)
+#ultrametric_dend2 = force.ultrametric(rooted_dend2)
+
+dend_comp_list = dendlist(unlist(ultrametric_dend1), unlist(ultrametric_dend2))
+
+
+                          
+dend1 = as.dendrogram(dend1_clock)
+dend2 = as.dendrogram(dend2_clock)
+
+dend_comp_list = dendlist(dend1, dend2)
+
+
+tangle_plot = tanglegram(dend1, dend2)
+
+png(filename = "D:/Sequence_Data/Phylogenetics_Project/Pictures/Test_tanglegram.png", width=4000, height=8000)
+plot(tangle_plot)
+dev.off()
+
+ggplot2::ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/Test_tanglegram.png",height=6, width=10, dpi=600)
+
+```
+
+
+#species tree stuff
+
+```{r}
+
+library(ape)
+library(phytools)
+
+read.tree()
+
+```
+
+
+
+###find common ancestory between nodes to figure out how to split paralogs
+
+```{r}
+
+library(phylotools)
+
+tree_in=read.tree("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/OG_Refinement/OG0000000_N0.HOG0000001/")
+
+```
+
+
+
+###get a tree and combine with different graphs. In this chunk, it's a phylogeny and heatmap for presence/absence 
+
+```{r}
+library(phytools)
+
+tree_in = read.newick("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Tree/RLK_OGs_Consensus.fasta_kinase_only_OUTGROUPS.fasta.aligned.treefile")
+
+pres_abs_csv = read.csv("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Split_NOGs_blastrefinement_names/gene_names_removed/RLKs_HOGs_BlastSplit_labelled.csv", row.names = 1, stringsAsFactors = FALSE)
+pres_abs_df = pres_abs_csv[,1:(ncol(pres_abs_csv)-3)]
+pres_abs_df = as.data.frame(sapply(pres_abs_df, as.numeric))
+rownames(pres_abs_df) = rownames(pres_abs_csv)
+
+LRR = rownames(pres_abs_csv)[pres_abs_csv$Family == "LRR"]
+CR4L = rownames(pres_abs_csv)[pres_abs_csv$Family == "CR4L"]
+CRK = rownames(pres_abs_csv)[pres_abs_csv$Family == "CRK"]
+CrRLK1L = rownames(pres_abs_csv)[pres_abs_csv$Family == "CrRLK1L"]
+Extensin = rownames(pres_abs_csv)[pres_abs_csv$Family == "Extensin"]
+LecRLK = rownames(pres_abs_csv)[pres_abs_csv$Family == "LecRLK"]
+LRK10L = rownames(pres_abs_csv)[pres_abs_csv$Family == "LRK10L"]
+MLRR = rownames(pres_abs_csv)[pres_abs_csv$Family == "MLRR"]
+PR5L = rownames(pres_abs_csv)[pres_abs_csv$Family == "PR5L"]
+RK3FL = rownames(pres_abs_csv)[pres_abs_csv$Family == "RK3FL"]
+RLCK = rownames(pres_abs_csv)[pres_abs_csv$Family == "RLCK"]
+SRK = rownames(pres_abs_csv)[pres_abs_csv$Family == "SRK"]
+WAK = rownames(pres_abs_csv)[pres_abs_csv$Family == "WAK"]
+URK = rownames(pres_abs_csv)[pres_abs_csv$Family == "URK"]
+
+test_tree = tree_in
+
+test_tree = paintBranches(test_tree, edge=sapply(LRR, match, test_tree$tip.label), state="LRR")
+test_tree = paintBranches(test_tree, edge=sapply(CR4L, match, test_tree$tip.label), state="CR4L")
+test_tree = paintBranches(test_tree, edge=sapply(CRK, match, test_tree$tip.label), state="CRK")
+test_tree = paintBranches(test_tree, edge=sapply(CrRLK1L, match, test_tree$tip.label), state="CrRLK1L")
+test_tree = paintBranches(test_tree, edge=sapply(Extensin, match, test_tree$tip.label), state="Extensin")
+test_tree = paintBranches(test_tree, edge=sapply(LecRLK, match, test_tree$tip.label), state="LecRLK")
+test_tree = paintBranches(test_tree, edge=sapply(LRK10L, match, test_tree$tip.label), state="LRK10L")
+test_tree = paintBranches(test_tree, edge=sapply(MLRR, match, test_tree$tip.label), state="MLRR")
+test_tree = paintBranches(test_tree, edge=sapply(PR5L, match, test_tree$tip.label), state="PR5L")
+test_tree = paintBranches(test_tree, edge=sapply(RK3FL, match, test_tree$tip.label), state="RK3FL")
+test_tree = paintBranches(test_tree, edge=sapply(RLCK, match, test_tree$tip.label), state="RLCK")
+test_tree = paintBranches(test_tree, edge=sapply(SRK, match, test_tree$tip.label), state="SRK")
+test_tree = paintBranches(test_tree, edge=sapply(WAK, match, test_tree$tip.label), state="WAK")
+test_tree = paintBranches(test_tree, edge=sapply(URK, match, test_tree$tip.label), state="URK")
+
+
+cols = setNames(c("#676bcf", "#d563ba", "#73b638", "#9f58c0", "#5fb96d", "#d33d72", "#48b6a5", "#d84e37", "#b5ad45", "#7191cf", "#de9039", "#9a4c73", "#5b7c39", "#df859c", "#a87c42", "#b85944"), c("LRR", "CR4l", "CRK", "CrRLK1L", "Extensin", "LecRLK", "LRK10L", "MLRR", "PR5L", "RK3FL", "RLCK", "SRK", "WAK", "URK"))
+plot(test_tree, colors=cols, lwd=4, split.vertical=TRUE, ftype="i")
+
+pres_abs_csv = 
+
+tree_in = reroot(tree_in, node.number=which(tree_in$node.label=="99.2/98"))
+
+#cladelabels(tree=tree_in, c("LRR", "RLCK", "LRR", "RLCK","RLCK", "Extensin"), c("I715", "92.5/98", "I672", "N0.HOG0000510", "I689", "I666"))
+
+#painted = paintBranches(tree_in, edge="I715", 2)
+#heatmap_plot = phylo.heatmap(tree_in, pres_abs_csv)
+
+png("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Figures/Pres_abs_heatmap.png", width=8000, height=15000)
+phylo.heatmap(test_tree, pres_abs_df, colors = c("white", "darkgreen"))
+dev.off()
+
+png("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Figures/Tree_coloures.png", width=8000, height=15000)
+plot(test_tree, colors=cols, lwd=4, split.vertical=TRUE, ftype="i")
+dev.off()
+
+```
+
+
+
+
+
+
+
+
+
+
+

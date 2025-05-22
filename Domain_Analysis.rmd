@@ -1,0 +1,588 @@
+---
+title: "Domain_Parsing"
+author: "Zachary Kileeg"
+date: "5/15/2021"
+output: html_document
+---
+
+```{r}
+
+library(dplyr)
+library(rhmmer)
+library(stringr)
+
+hmmscan_output_folder="D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/Family_I.1"
+
+brassicaceae_list=read.csv("D:/Sequence_Data/Phylogenetics_Project/2021_May15_brassicaceae_codes.csv")
+
+
+hmmscan_output=read_domtblout(paste(hmmscan_output_folder, "/2021_May11_HMMSCAN_LRRI.1.txt", sep=""))
+hmmscan_kinase_output=read_domtblout(paste(hmmscan_output_folder, "/2021_May11_HMMSCAN_LRRI.1_KinaseOnly.txt", sep=""))
+
+hmmscan_ECD = hmmscan_output %>% filter(!(domain_name %in% hmmscan_kinase_output$domain_name))
+hmmscan_ECD = cbind(str_remove(hmmscan_ECD$query_name,"_.*"),hmmscan_ECD)
+colnames(hmmscan_ECD)[1] = "Five_Letter_Code"
+
+arabidopsis_only = hmmscan_ECD %>% filter(Five_Letter_Code == "Athal")
+arabidopsis_domains = unique(arabidopsis_only$domain_name)
+
+non_brassicaceae_list = hmmscan_ECD %>% filter(!(Five_Letter_Code %in% brassicaceae_list$code)) #get domains for non-brassicaceae
+non_brassicaceae_domains = non_brassicaceae_list %>% filter(!(domain_name %in% brassicaceae_output$domain_name))
+
+brassicaceae_output = hmmscan_ECD %>% filter(Five_Letter_Code %in% brassicaceae_list$code)   #get brassicaceae only domains
+novel_brassicaceae_domains = brassicaceae_output %>% filter(!(domain_name %in% non_brassicaceae_domains$domain_name))
+
+#common_domains = brassicaceae_output %>% filter(domain_name %in% non_brassicaceae_domains$domain_name)
+
+#non_arabidopsis_domains = brassicaceae_output %>% filter(!(domain_name %in% arabidopsis_domains)) #get brassicaceae domains not found in arabidopsis
+
+#unique_brassicaceae_domains = unique(non_arabidopsis_domains$domain_name)
+
+
+
+
+
+
+#Assign and count values found for each domain for brassicaceae only
+
+domain_counts = matrix(nrow=nrow(novel_brassicaceae_domains), ncol=4)
+
+domain_counts[,1] = novel_brassicaceae_domains$domain_name
+colnames(domain_counts) = c("Domain", "Num_Genes", "Num_Species", "Species_Names")
+
+for(i in 1:nrow(domain_counts)){
+  
+  domain_hits = novel_brassicaceae_domains %>% filter(domain_name %in% domain_counts[i,1])
+  
+  num_genes = length(unique(domain_hits$query_name))
+  
+  species = unique(domain_hits$Five_Letter_Code)
+  
+  num_species = length(species)
+  
+  
+  domain_counts[i,2:4] = c(num_genes, num_species, paste(species, sep="", collapse = ","))
+                   
+              
+}
+
+
+count_out = unique(domain_counts)
+
+
+write.csv(count_out, "D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/Family_I.1/2021_Aug16_Brassica_Unique_Domains.csv", row.names=FALSE)
+
+
+
+#Assign and count domains found for each domain for non-brassicaceae species
+domain_counts_NonBR = matrix(nrow=nrow(non_brassicaceae_domains), ncol=4)
+
+domain_counts_NonBR[,1] = non_brassicaceae_domains$domain_name
+colnames(domain_counts_NonBR) = c("Domain", "Num_Genes", "Num_Species", "Species_Names")
+
+for(i in 1:nrow(domain_counts_NonBR)){
+  
+  domain_hits = non_brassicaceae_domains %>% filter(domain_name %in% domain_counts_NonBR[i,1])
+  
+  num_genes = length(unique(domain_hits$query_name))
+  
+  species = unique(domain_hits$Five_Letter_Code)
+  
+  num_species = length(species)
+  
+  
+  domain_counts_NonBR[i,2:4] = c(num_genes, num_species, paste(species, sep="", collapse = ","))
+                   
+              
+}
+
+count_test_NonBR = unique(domain_counts_NonBR)
+
+#Assign and count common domains across everything
+
+
+
+
+```
+
+### Count function
+
+```{r}
+
+#Assign and count values found for each domain for input clades
+
+Domain_hit_count = function(Input_Clades, hmmscan_output, hmmscan_kinase_output, output_folder) {
+  
+  
+  library(dplyr)
+  library(rhmmer)
+  library(stringr)
+  library(plyr)
+  
+  
+
+  clades = read.csv(Input_Clades)   #read clades information
+  
+  #Mappings = vector(mode="list", length=ncol(clades))    #make output list
+  #names(Mappings) = colnames(clades)    #
+  
+  #domain_comparison = matrix(nrow=nrow(clades), ncol=ncol(clades))
+  #colnames(domain_comparison) = colnames(clades)
+  
+ domain_comparison = data.frame("Placeholder")
+ colnames(domain_comparison) = "Domain"
+  
+ # storage_list=vector(mode = "list", length=ncol(clades))
+  
+  
+  
+
+for (j in 1:ncol(clades)){
+  
+  
+  
+  
+  print(paste("Working on...", colnames(clades[j]), sep=""))
+  
+  
+  
+  #hmmscan_output_folder="D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/Family_I.1"
+
+  #brassicaceae_list=read.csv("D:/Sequence_Data/Phylogenetics_Project/2021_May15_brassicaceae_codes.csv")
+
+ # Protein_List = clades[j]
+
+
+  #hmmscan_output=read_domtblout(Hmmer_Output)
+  #hmmscan_kinase_output=read_domtblout(Hmmer_Output_Kinase)
+
+  hmmscan_ECD = hmmscan_output %>% filter(!(domain_name %in% hmmscan_kinase_output$domain_name))  #extract ECD_only domains
+  hmmscan_ECD = cbind(str_remove(hmmscan_ECD$query_name,"_.*"),hmmscan_ECD) #extract 5 letter codes and add to column as first column of data frame
+  colnames(hmmscan_ECD)[1] = "Five_Letter_Code"  #set name of first column
+
+  #arabidopsis_only = hmmscan_ECD %>% filter(Five_Letter_Code == "Athal")
+  #arabidopsis_domains = unique(arabidopsis_only$domain_name)
+
+  #non_brassicaceae_list = hmmscan_ECD %>% filter(!(Five_Letter_Code %in% brassicaceae_list$code)) #get domains for non-brassicaceae
+  #non_brassicaceae_domains = non_brassicaceae_list %>% filter(!(domain_name %in% brassicaceae_output$domain_name))
+
+  clade_domains = hmmscan_ECD %>% filter(query_name %in% clades[[j]])   #get HMMscan hits for the current clade. clades input needs to be a character vector here.
+  #novel_brassicaceae_domains = brassicaceae_output %>% filter(!(domain_name %in% non_brassicaceae_domains$domain_name))
+
+  domain_counts = matrix(nrow=nrow(clade_domains), ncol=5)    #set matrix for storage of domain counts
+
+  domain_counts[,1] = clade_domains$domain_name  #set first column to clade domain names
+  domain_counts = unique(domain_counts)   #reduce to unique set of domains
+  colnames(domain_counts) = c("Domain", "Num_Genes", "Num_Species", "Species_Names", "Protein_Names")   #change column names
+
+  
+  #Loop through the domains found in all clades
+  for(i in 1:nrow(domain_counts)){
+    
+    # filter clade information for presence of domain
+    domain_hits = clade_domains %>% filter(domain_name %in% domain_counts[i,1])
+  
+    num_genes = length(unique(domain_hits$query_name))   #count genes from list containing domain
+  
+    species = unique(domain_hits$Five_Letter_Code)  #add together the species names 5 letter codes
+  
+    num_species = length(species)  #count number of species with domain present in a protein
+    
+    protein_names = unique(domain_hits$query_name)  #get list of protein names
+  
+    #Add above information to domain counts matrix for output
+    domain_counts[i,2:5] = c(num_genes, num_species, paste(species, sep="", collapse = ","), paste(protein_names, sep="", collapse=","))
+    
+    
+    
+    
+    
+    }      #second for loop      
+  
+  #write csv output of domain hits for that particular clade
+  write.csv(domain_counts, paste(output_folder, "/", Sys.Date(), "_", colnames(clades[j]), "_Domain_Counts.csv", sep=""), row.names=FALSE)
+
+  
+  ######################## second section - domain overlap comparison  ###############
+  domain_counts = as.data.frame(domain_counts[,1:2])  #coerce to data frame for further steps
+  
+  colnames(domain_counts) = c("Domain", paste("LRRI.", j))
+  #bind together all domain hit information from all clades. FOr usage in next section after end of loop. Transposes original data for rbind.fill to work
+  #domain_comparison = rbind.fill(domain_comparison, as.data.frame(t(domain_counts$Domain)))
+  
+  domain_comparison = full_join(domain_comparison, domain_counts, by="Domain")
+  
+  }   #First for loop
+  
+  
+  
+  #domain_comparison = t(domain_comparison)   #transpose for usage from rbind.fill
+  #colnames(domain_comparison) = colnames(clades)   #set column names
+  
+#  domain_key = unique(data.frame(newcol = c(t(domain_comparison)), stringsAsFactors = FALSE))   #get list of non-redundant domain hits
+#  row.names(domain_key) = 1:nrow(domain_key) #reorder row names starting from 1
+  
+  
+ # domain_hit_storage = matrix(nrow=nrow(domain_key), ncol=ncol(clades))   #set holding matrix for domain overlap information
+#  domain_hit_storage[,1] = domain_key[,1]    #set first column to domain key
+#  colnames(domain_hit_storage) = c("Domain_Name", colnames(clades))
+  
+  
+  #iterate through all domains in domain key and add them to matrix for comparisons
+ # for (k in 1:nrow(domain_key)){
+    
+    #for (l in 1:length(domain_key)){
+      
+     # domain_occurrence = grep()
+    #}
+    
+    #Pull out which subfamilies contain the specific domain 
+#  #  subfamily_content = which('dim<-'(grepl(paste("^",domain_key[k,1], "$", sep=""), domain_comparison), dim(domain_comparison)), arr.ind=TRUE)
+    
+    #domain_number = grep(paste("^",as.character(domain_key[k,1]), "$", sep=""),)
+#    
+ #   total_domain_hits = hmmscan_output %>% filter(domain_name %in% domain_key[k,])
+    
+    
+    #combine and collapse subfamilies into one string
+  #  domain_hit_storage[k,2] = paste(colnames(clades[subfamily_content[,2]]), sep="", collapse=",")
+    
+  #}
+  
+ #remove NAs
+ domain_comparison[is.na(domain_comparison)] <- 0
+ #remove placeholder row
+ domain_comparison = domain_comparison[-1,]
+  #print(domain_hit_storage)
+  #write output of comparisons
+  write.csv(domain_comparison, paste(output_folder, "/", Sys.Date(), "_Domain_OverlapComparison.csv", sep=""), row.names=FALSE )
+  #common_domains = Reduce(intersect, list(domain_comparison[,1], domain_comparison[,2], domain_comparison[,3], domain_comparison[,4], domain_comparison[,5], domain_comparison[,6], domain_comparison[,7], domain_comparison[,8], domain_comparison[,9]))
+  
+
+  
+}  #end function
+
+
+```
+
+### Clades input 
+
+```{r}
+
+library(rhmmer)
+
+#clades = read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/LRR_Families/LRRI_Subclades.csv")
+clades_input="D:/Sequence_Data/Phylogenetics_Project/Clustering/Predict_PhytoLRR/2022_May26_Subclades_Content.csv"
+hmmeroutput = read_domtblout("D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/2021_Aug3_LRRI_HMMScan_Output.txt")
+hmmer_kinase=read_domtblout("D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/2021_May11_HMMSCAN_LRRI_KinaseOnly.txt")
+output_directory="D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/Family_I.1"
+
+hmmtbl = cbind(hmmeroutput[,1:4], hmmeroutput[,5:6], hmmeroutput[,20:21])
+
+
+  
+Domain_hit_count(Input_Clades=clades_input, hmmscan_output=hmmeroutput, hmmscan_kinase_output = hmmer_kinase, output_folder=output_directory)
+  
+
+
+
+```
+
+
+###Plot domain stuff
+```{r}
+
+library(ggplot2)
+library(rhmmer)
+library(dplyr)
+library(stringr)
+
+#plot.new()
+
+#height1 = 0.4
+#height2 = 0.5
+#height3 = 0.6
+#height4 = 0.7
+
+#segments(0, height1, 200, height1, lwd=3)
+#segments(0, height2, 200, height2, lwd=3)
+#segments(0, height3, 200, height3, lwd=3)
+#segments(0, height4, 200, height4, lwd=3)
+
+#arrowLen = 0.01
+#boxHeight = 0.04
+#left = 100
+#right = 120
+#arrowStart = 100
+#height = height1
+#geneFillColor = as.character("steelblue3")
+
+
+#plot.new()
+#polygon(x=c(1, 5, 1, 5), 
+       # y=c(0, 0, 0.5, 0.5), 
+        #col="blue", lwd = 0.5)
+
+#clades = read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/LRR_Families/LRRI_Subclades.csv")
+
+#hmmer_clade_in = read_domtblout("D:/Sequence_Data/Ecotype_DataFiles/LRR_RK_domains_representative.txt")
+
+#clades = read.csv("D:/Sequence_Data/Phylogenetics_Project/LRK10Ls/2022_Aug16_Predicted_LRK10L_Genes_25Species.csv", header=FALSE)
+#hmmer_clade_in = read.table("D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/2021_Aug5_LRRI.1HMMScan_Sorted.txt", header=TRUE)
+
+
+
+
+
+
+#hmmtbl = cbind(hmmer_clade_in[,1:4], hmmer_clade_in[,5:6], hmmer_clade_in[,20:21])
+
+numbered_clade = hmmer_clade_in%>% group_by(query_name) %>% mutate(id=cur_group_id())
+
+#key = as.matrix(unique(hmmer_clade_in$query_name))
+
+thing = unique(cbind(hmmer_clade_in$query_name, hmmer_clade_in$qlen))
+key_geom_line = cbind(thing, 1:nrow(thing))
+
+#subset clade information for proper visualization. Takes representative sequences
+hmmclade_subset = rbind(numbered_clade[62:73,], numbered_clade[1142:1154,], numbered_clade[1117:1131,])
+hmmclade_subset = data.frame(c())
+
+#meant for fixing order of ID
+hmmclade_subset[1:12,9] = 1
+hmmclade_subset[13:25,9] = 2
+hmmclade_subset[26:40,9] = 3
+
+test_subset = numbered_clade[879:888,]
+
+#common_domains_key = unique(numbered_clade$domain_name)
+
+common_domains = matrix(nrow=length(common_domains_key), ncol=2)
+common_domains[,1] = unique(numbered_clade$domain_name)
+
+for (i in 1:nrow(common_domains)){
+  
+  common_domains[i,2] = length(grep(common_domains[i,1], numbered_clade$domain_name))
+  
+}
+
+common_domains_key = common_domains[as.numeric(common_domains[,2])>=100,]
+
+common_domains_subset = numbered_clade %>% filter(domain_name %in% c("Malectin", "Malectin_like", "LRR_1", "LRR_2", "LRR_4", "LRR_6", "LRR_8", "Pkinase"))
+
+common_domains_subset = numbered_clade %>% filter(domain_name %in% common_domains_key[,1])
+uncommon_domains_subset = numbered_clade %>% filter(!(domain_name %in% common_domains_subset$domain_name))
+
+#meant for representative architectures
+#common_domains_subset = hmmclade_subset %>% filter(domain_name %in% c("Malectin", "Malectin_like", "LRR_1", "LRR_2", "LRR_4", "LRR_6", "LRR_8", "Pkinase","PK_Tyr_Ser-Thr"))
+
+simplified_subset = common_domains_subset
+simplified_subset$domain_name = gsub("LRR.*", "LRR", common_domains_subset$domain_name, perl=TRUE)
+
+#subset clade information for proper visualization
+#hmmclade_subset = rbind(numbered_clade[62:73,], numbered_clade[1142:1154,], numbered_clade[1117:1131,])
+subclade_subset = simplified_subset %>% filter(query_name %in% clades$LRR.23)
+#y_axis_labels = unique(clades$LRR.4)
+
+#set axis labels to simplify labeling y axis
+#y_axis_labels = key_geom_line[,1]
+
+#plot simplified (condensed) domains
+#ggplot(subclade_subset) + geom_rect(aes(xmin=0, xmax=qlen, ymin=id-0.02, ymax=id+0.02)) + geom_rect(aes(xmin=env_from, xmax=env_to, ymin=id-0.1, ymax=id+0.1,  fill=domain_name)) + scale_y_discrete(limits=y_axis_labels) + theme(axis.text.y = element_text(size=1))
+
+name_order = c("LRR-I", "LRR-II", "LRR-III", "LRR-IV", "LRR-V", "LRR-VI-1", "LRR-VI-2", "LRR-VII-1", "LRR-VII-2", "LRR-VII-3", "LRR-VIII-1", "LRR-VIII-2", "LRR-Xa", "LRR-")
+
+ggplot(simplified_subset) + geom_segment(aes(x=0, y=query_name, xend=qlen, yend=query_name), size=0.5) + geom_rect(aes(xmin=env_from, xmax=env_to, ymin=query_name, ymax=query_name, color=domain_name), size = 1.5) + scale_y_discrete(aes(limits=query_name)) + scale_y_discrete(name="Protein Name") + labs(x = "Amino Acids") + theme(axis.text.y = element_text(size=6), axis.line.y = element_blank(), axis.ticks.y=element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) 
+
+#export last image
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Pictures/2022_June20_LRRI.23_CommonDomains.png", height=80, width=10, dpi=600, limitsize=FALSE)
+
+ggsave("D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/LRK10Ls/LRK10Ls.png", height=80, width=10, dpi=600, limitsize=FALSE)
+ggsave("D:/Sequence_Data/Ecotype_DataFiles/LRR-RK_RepresentativeDomains.png", height=20, width=10, dpi=600, limitsize=FALSE)
+
+
+#test = data.frame(x1 = c(1,1,3,4,5), x2 = c(1.5,1.5,3.5,4.5,5.5), y1=c(1,2,3,4,5),y2=c(1.5,2.5,3.5,4.5,5.5), t=c('a','a','a','a','b'))
+
+
+ggplot(numbered_clade) + geom_rect(aes(xmin=0, xmax=qlen, ymin=id-0.02, ymax=id+0.02)) + geom_rect(aes(xmin=env_from, xmax=env_to, ymin=id-0.1, ymax=id+0.1,  fill=domain_name)) + theme(text=element_text(size=40),  axis.text.y=element_blank(), axis.line.y = element_blank(), axis.ticks.y=element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+ggplot(hmmclade_subset) + geom_rect(aes(xmin=0, xmax=qlen, ymin=id-0.02, ymax=id+0.02)) + geom_rect(aes(xmin=env_from, xmax=env_to, ymin=id-0.1, ymax=id+0.1, fill=domain_name)) + theme(text=element_text(size=40), axis.text.y=element_blank(), axis.line.y = element_blank(), axis.ticks.y=element_blank(),  panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+
+#For specific domain subsets
+common_domains_subset = numbered_clade %>% filter(query_name %in% "Athal_AT5G59670.2")
+ggplot(common_domains_subset) + geom_rect(aes(xmin=0, xmax=qlen, ymin=id-0.03, ymax=id+0.03)) + geom_rect(aes(xmin=env_from, xmax=env_to, ymin=id-0.1, ymax=id+0.1, fill=domain_name)) + theme(text=element_text(size=40),  axis.text.y=element_blank(), axis.line.y = element_blank(), axis.ticks.y=element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+#different shapes test
+
+ggplot(numbered_clade) + geom_rect(aes(xmin=0, xmax=qlen, ymin=id-0.02, ymax=id+0.02)) + geom_polygon(aes(xmin=env_from, xmax=env_to, ymin=id-0.1, ymax=id+0.1,  fill=domain_name)) + theme(text=element_text(size=40),  axis.text.y=element_blank(), axis.line.y = element_blank(), axis.ticks.y=element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+########################################################
+ggplot(numbered_clade) + geom_polygon(aes(x=testx, y=testy, fill="blue", group=id))
+
+ggplot(test_subset) + geom_polygon(aes(x=c(position_matrix[,1], position_matrix[,2], position_matrix[,3], position_matrix[,4]), y=c(position_matrix[,5], position_matrix[,6], position_matrix[,7], position_matrix[,8]), group=id, fill=domain_name))
+
+data = structure(list(testx1 = c(numbered_clade$env_from, (numbered_clade$env_to - numbered_clade$env_from)/2, (numbered_clade$env_to - numbered_clade$env_from)/2, numbered_clade$env_to)))
+testy = c(numbered_clade$id, numbered_clade$id+0.5, numbered_clade$id-0.5, numbered_clade$id)
+
+position_matrix = matrix(nrow=nrow(test_subset), ncol=8)
+for (i in 1:nrow(test_subset)){
+  
+  position_matrix[i,] = c(as.integer(test_subset[i,7]), (as.integer(test_subset[i,8]) - as.integer(test_subset[i,7]))/2, (as.integer(test_subset[i,8]) - as.integer(test_subset[i,7]))/2, as.integer(test_subset[i,8]), as.integer(test_subset[i,9]), as.integer(test_subset[i,9])+0.5, as.integer(test_subset[i,9])-0.5, as.integer(test_subset[i,9]))
+  
+  
+
+  
+  
+  
+}
+
+```
+
+
+###find proteins containing exact match to a given motif
+```{r}
+
+
+library(phylotools)
+library(dplyr)
+
+
+
+input_fasta = read.fasta("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/Mar30_2021_Phytozome_Primary_Transcripts/2023_Sep_Combine_113_Species_LRR-RKs_FullLength.fasta")
+
+contains_gdcp = input_fasta[grepl("GDPC", input_fasta$seq.text),]
+#filtered_GDPC = input_fasta %>% filter(seq.text == "GDPC")
+
+write.table(contains_gdcp$seq.name, "D:/Sequence_Data/Phylogenetics_Project/2023_Sep19_LRRI.1_GDCPContaining_Proteins.names.txt", col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+
+
+```
+
+###take hmmscan input then find the most common domains and filter by prevalence. If they're found more than 2 times, if may be real or common. More filtering needs to be done by type. For example, wak and wak-like are similar enough they should be considered as part of the same family, so if wak is 10 and wak-like is 2, wak-like should be kept. 
+```{r}
+library(dplyr)
+library(rhmmer)
+
+hmmscan_folder = "D:/Analysis_Output/hyphy/CDS/Dec_stuff/RLKs_only/Translated/AlteredGapChar/Consensus/HMMScan/Consensus/"
+hmmscan_files = list.files(hmmscan_folder, pattern="*.txt")
+colour_code_file = "D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/Trees/Colourcode.csv"
+
+
+#this part you only need to run once to get the total collection. 
+holding_vector = vector()
+for (i in 1:length(hmmscan_files)){
+
+  
+  hmmscan_in = read_domtblout(paste(hmmscan_folder, hmmscan_files[i], sep=""))
+  
+  gene_name = gsub(".cds.*","",hmmscan_files[i])
+  
+  holding_vector = c(holding_vector, unique(hmmscan_in$domain_name))
+
+
+}
+
+domain_summary = table(holding_vector)
+
+filtered_vector = domain_summary[domain_summary>2]
+
+write.table(filtered_vector, colour_code_file, row.names=FALSE, col.names=FALSE, sep=",")
+
+
+```
+
+
+###take hmmscan input then rearrange into format for itol input. IMPORTANT!!!!!! The number of selection analysis files should equal the number of hmmscan files
+```{r}
+library(dplyr)
+library(rhmmer)
+
+hmmscan_folder = "D:/Analysis_Output/hyphy/CDS/Dec_stuff/RLKs_only/Translated/AlteredGapChar/Consensus/HMMScan/Consensus/"
+hmmscan_files = list.files(hmmscan_folder, pattern="*.txt")
+colour_code = read.csv("D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/Trees/Domains_ColourCode.csv")
+
+selection_out_folder = "D:/Analysis_Output/hyphy/CDS/Dec_stuff/RLKs_only/Selection_Parsed/"
+output_folder = "D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/Trees/"
+
+pos_sel_files = list.files(selection_out_folder, pattern = "*posSelection.csv")
+
+output_dataframe=data.frame("ITOL_Domain_Instruction")
+
+#need to get it into this format: name,protein_size,shape1|start|stop|colour|label,shape2|start|stop|colour|label,shapeN|start|stop|colour|label
+#this is an example of protein 1, that is 1200 AAs in length, that has three domains to label:
+#Protein1,1200,RE|100|150|#ff0000|SH2,EL|400|500|#0000ff|SH3,OC|700|900|#00ff00|PH
+
+if(length(pos_sel_files) != length(hmmscan_files)){
+  
+  stop("Number of selection files and domain files do not match.")
+}
+
+for (i in 1:length(hmmscan_files)){
+
+  
+  gene_name = gsub(".cds.*","",hmmscan_files[i])
+  
+  hmmscan_in = try(read_domtblout(paste(hmmscan_folder, hmmscan_files[i], sep="")), silent=TRUE)
+  
+  
+  if ((class(hmmscan_in) != "try-error") && (nrow(hmmscan_in) >0)){
+  
+  hmmscan_in = hmmscan_in[order(hmmscan_in$env_from),]
+  
+  
+  
+  holding_vector = paste(gene_name,unique(hmmscan_in$qlen),sep=",")
+
+  
+  #loop over domains so we can get their information
+  for (k in 1:nrow(hmmscan_in)){
+    
+    domain_name = hmmscan_in[k,1]
+    domain_name_color_shape = colour_code[which(colour_code$Domain == domain_name[[1]]),]
+    domain_shape = domain_name_color_shape[1,2]
+    domain_colour = domain_name_color_shape[1,3]
+    
+    domain_info = paste(domain_shape, hmmscan_in$env_from[k], hmmscan_in$env_to[k], domain_colour, domain_name, sep="|")
+    
+    
+    
+    holding_vector=paste(holding_vector,domain_info, sep=",")
+  }
+  
+  
+  #get the selection input then add teh correct format to it. Use the circle shape red colour for positively selected sites. EL = elipse, red = Hex #FF0000
+  selection_df = read.csv(paste(selection_out_folder, pos_sel_files[i], sep=""))
+  
+  #we need to catch if the input selection file is empty. If it is not empty, get selection info. If it is, don't run. 
+  if (nrow(selection_df) > 0){
+  
+  #get selection positions
+  selection_df$Position = paste("EL", selection_df$Position, selection_df$Position+2,"#FF0000", sep="|")
+  
+  #flatten vector into a single string and remove spaces
+  selection_info = gsub(" ", "", str_flatten_comma(selection_df$Position))
+  
+  #add to the end. This should make it so the positively selected sites are on top of the domains
+  holding_vector = paste(holding_vector, selection_info, sep=",")
+  
+  }
+  
+  #get information for 
+  
+  } else {
+    
+    holding_vector = paste(gene_name, "EMPTY OR MISSING HMMSCAN FILE", sep=":")
+  }
+
+  output_dataframe = rbind(output_dataframe, holding_vector)
+
+}
+
+write.table(output_dataframe, paste(output_folder, "RLK_Domains_PosSites_Representative_ITOL_Label.csv", sep=""), row.names=FALSE, col.names=FALSE, sep=",")
+
+
+
+```
+
+

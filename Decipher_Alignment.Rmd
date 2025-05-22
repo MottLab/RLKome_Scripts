@@ -1,0 +1,66 @@
+---
+title: "Decipher_Alignment"
+author: "Zach Kileeg"
+date: "2024-11-20"
+output: html_document
+---
+
+##Alignment using DECIPHER for codon sequences
+```{r}
+
+
+
+require(DECIPHER)
+
+directory = "D:/Analysis_Output/hyphy/CDS/Dec_stuff/"
+files_list=list.files(directory,pattern="*_fixed_seqs.cds$")
+
+for (i in 1:length(files_list)){
+  fas = paste(directory, files_list[i], sep = "")
+  seqs = readDNAStringSet(fas)  #read fasta file and assign to variable
+  seqs = OrientNucleotides(seqs) #orient nucleotides to ensure correct reading frames
+ # Translate DNA sequences to amino acids, align them based on protein sequence, and reverse transcribe for output
+  aligned = AlignTranslation(myXStringSet = seqs, refinements = 10, readingFrame = 1, type = "DNAStringSet")  
+  #aligned = AlignSeqs(seqs) 
+  
+  #Use this function here if you want to align sequences based on DNA only
+  #aligned = AlignSeqs(myXStringSet = seqs, refinements = 5)
+  #aligned_adjusted = AdjustAlignment(aligned)
+  
+  #write fasta alignment out
+  writeXStringSet(aligned, file=paste(directory,files_list[i],"_DECIPHERAligned.fasta",sep=""))
+  
+}
+
+```
+
+
+
+##Alignment using DECIPHER for codon sequences as permutations
+```{r}
+
+
+
+require(DECIPHER)
+
+directory = "D:/Analysis_Output/hyphy/CDS/"
+files_list=list.files(directory,pattern="*fixed_seqs.cds$")
+
+for (i in 1:length(files_list)){
+  fas = paste(directory, files_list[i], sep = "")
+  seqs = readDNAStringSet(fas)  #read fasta file and assign to variable
+  seqs = OrientNucleotides(seqs) #orient nucleotides to ensure correct reading frames
+ # Translate DNA sequences to amino acids, align them based on protein sequence, and reverse transcribe for output
+  aligned = AlignTranslation(myXStringSet = seqs, refinements = 10, readingFrame = 1, type = "DNAStringSet")  
+  #aligned = AlignSeqs(seqs) 
+  
+  #Use this function here if you want to align sequences based on DNA only
+  #aligned = AlignSeqs(myXStringSet = seqs, refinements = 5)
+  #aligned_adjusted = AdjustAlignment(aligned)
+  
+  #write fasta alignment out
+  writeXStringSet(aligned, file=paste(directory,files_list[i],"_DECIPHERAligned.fasta",sep=""))
+  
+}
+
+```

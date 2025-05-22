@@ -1,0 +1,983 @@
+---
+title: "HMMER_Analysis"
+author: "Zachary Kileeg"
+date: "1/16/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Package loading chunk
+
+```{r}
+library(rhmmer)
+library(dplyr)
+library(DECIPHER)
+library(phylotools)
+library(stringr)
+```
+
+## used for the arabidopsis species analysis
+
+```{r}
+
+
+name = list.files("C:/Users/kileegza/Documents/HMMER/Phytozome/Acomosus", pattern = "*.txt", recursive = TRUE, full.names = TRUE)
+folders = list.dirs("C:/Users/kileegza/Documents/HMMER/Phytozome", recursive = TRUE, full.names = TRUE)
+
+for (j in (1:length(folders))){
+  
+  for (i in (1:length(name))){
+    
+    hmm_tbl = read_tblout(name[i])
+    lrrget = grep("LRR", name[i], fixed = TRUE)
+    
+    if (lrrget == 1){
+      
+    }
+    
+    else{
+      
+     }
+    }
+    print(lrrget)
+  }
+
+thing = read_tblout("C:/Users/kileegza/Documents/HMMER/Arabidopsis_ecotypes/An/Test stuff/An_1_prot.fasta_LRR_1.hmm.out.txt")
+thing2 = read_tblout("C:/Users/kileegza/Documents/HMMER/Arabidopsis_ecotypes/An/Test stuff/An_1_prot.fasta_LRR_2.hmm.out.txt")
+
+thing3 = rbind(thing, thing2)
+```
+
+
+## used for the arbaidopsis ecotypes
+```{r}
+
+require(rhmmer)
+require(dplyr)
+
+#get names of folders, corresponding to ecoptyes, and file names inside, corresponding to hmmer output files
+
+file_search_pattern="*.fasta"
+
+hmmsearch_directory = "C:/Users/kileegza/Documents/HMMER/HMMSEARCH_Outputs/Jan_2021_26_Ecotype_LRR"   #Set directory variable for further usage in chunks
+
+fasta_directory = "C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/Cleaned_Sep_2020"
+  
+#get folder list to iterate over  
+folders = list.dirs(hmmsearch_directory, recursive = FALSE, full.names = TRUE)
+
+#get list of fasta files used in all directories and subdirectories
+
+fasta_files = list.files(fasta_directory, recursive=TRUE, pattern=file_search_pattern, full.names=TRUE) 
+
+
+
+
+
+
+  
+#loop through folders, and grab gene information from each output file, find intersections between LRR containing proteins and four other domains
+for (j in (1:length(fasta_files))){
+#for (j in (3:3)){            #line is for testing
+  
+  if (file.info(fasta_files[j])[1,"size"] > 0){
+  #make tables to store information
+  lrr_table = matrix(nrow = 0, ncol = 1)
+  Output = matrix(nrow = 0, ncol = 1)
+
+  phylo_table = matrix(nrow = 0, ncol = 2)
+  
+  
+  #make table to store info
+  rand_tbl = matrix(nrow = 0, ncol = 1)
+  
+  #dataframe to store names of hmmer output files with LRRs in the name
+  name = list.files((folders[j]), pattern = paste(file_search_pattern, ".*LRR.*.txt", sep=""), recursive = FALSE, full.names = TRUE)
+  
+  
+  
+  
+  #loop through elements of each ecotype directory, get hmm table output, and add LRR names to the table to get total LRRs in HMMER output
+  for (i in (1:length(name))){
+ # for (i in (3:3)){
+    #print(i)
+    #print(name[i])
+    hmm_tbl = read_tblout(name[i])
+    
+    #add names onto LRR dataframe column
+    lrr_table = rbind(lrr_table, hmm_tbl[1])
+    
+    
+   
+    
+  }
+  
+  
+  
+  lrr_table = unique(lrr_table)
+
+  
+  
+  
+  
+  
+  
+  #get data table from hmmer for each of non-LRR elements
+  malectin_like = read_tblout(list.files((folders[j]), pattern = paste(file_search_pattern, ".*Malectin_like.*", sep=""), recursive = FALSE, full.names = TRUE))
+  malectin = read_tblout(list.files((folders[j]), pattern = paste(file_search_pattern, ".*Malectin.hmm.*", sep=""), recursive = FALSE, full.names = TRUE))
+  pkinase = read_tblout(list.files((folders[j]), pattern = paste(file_search_pattern, ".*Pkinase.hmm.*", sep=""), recursive = FALSE, full.names = TRUE))
+  pkinase_tyr = read_tblout(list.files((folders[j]), pattern = paste(file_search_pattern, ".*Pkinase_Tyr.*", sep=""), recursive = FALSE, full.names = TRUE))
+  NBarc = read_tblout(list.files((folders[j]), pattern= paste(file_search_pattern, ".*NB-ARC.hmm.*", sep=""), recursive=FALSE, full.names=TRUE))
+  TIR =  read_tblout(list.files((folders[j]), pattern= paste(file_search_pattern, ".*TIR.hmm.*", sep=""), recursive=FALSE, full.names=TRUE))
+  RPW =  read_tblout(list.files((folders[j]), pattern= paste(file_search_pattern, ".*RPW8.hmm.*", sep=""), recursive=FALSE, full.names=TRUE)) 
+  
+  #find common proteins/genes between the LRRs and the non-LRR domains 
+  mal_like_intersect = intersect(lrr_table$domain_name, malectin_like$domain_name)
+  malectin_intersect = intersect(lrr_table$domain_name, malectin$domain_name)
+  pkinase_intersect = intersect(lrr_table$domain_name, pkinase$domain_name)
+  pkinase_tyr_intersect = intersect(lrr_table$domain_name, pkinase_tyr$domain_name)
+  nb_arc_intersect = intersect(lrr_table$domain_name, NBarc$domain_name)
+  NLRs = unique(c(NBarc$domain_name, TIR$domain_name, RPW$domain_name))
+  
+  
+  #lrr_rlp2 = setdiff(lrr_table$domain_name, pkinase$domain_name)
+  #lrr_rlp3 = setdiff(lrr_table$domain_name, NLRs)
+  lrr_rlps = unique(setdiff(lrr_table$domain_name, pkinase_intersect), setdiff(lrr_table$domain_name, nb_arc_intersect))
+  LRRs = unique(setdiff(lrr_table$domain_name, pkinase_intersect), setdiff(lrr_table$domain_name, nb_arc_intersect))
+  LRR_RKs = pkinase_intersect[!(pkinase_intersect %in% NLRs)]
+  
+  #store these in a list
+  output_list = list(unique(lrr_table$domain_name), mal_like_intersect, malectin_intersect, pkinase_intersect, pkinase_tyr_intersect, nb_arc_intersect, pkinase$domain_name, lrr_rlps, NLRs, LRR_RKs)
+  #make lenghts of each list element consistent by adding NAs
+  thing = lapply(output_list, 'length<-', max(lengths(output_list)))
+  
+  #put columns together into matrix, and column names
+  output = do.call(cbind, thing)
+  colnames(output) = c("LRRs", "mal_like_LRR", "malectin_LRR", "pkinase_LRR", "pkinase_tyr_LRR","NB-ARC", "pkinase_only", "potential_LRRRLPs", "NLRs", "LRR_RKs")
+  
+  #length = which.max(lapply(output_list, length))
+  #length_size = length(output_list[[which.max(lapply(output_list, length))]])
+  
+  
+  #thingy = lapply(output_list, 'length<-', length(output_list[[which.max(lapply(output_list, length))]]))
+  
+  #Output = as.matrix(unlist(output_list, recursive=TRUE), ncol = 4, byrow = TRUE)
+  
+  #Output= merge(Output, pkinase_intersect, all = L)
+  
+  #write output with names
+  
+  
+  write.csv(x=output, file=paste(folders[j], "/", tools::file_path_sans_ext(basename(fasta_files[j])), "_Out.csv", sep=""), row.names=FALSE)
+  
+  
+  
+  #fasta_stuff = read.fasta(fasta_files[j])
+  
+  #fasta_tree = fasta_stuff[fasta_stuff$seq.name %in% pkinase_intersect,]
+  
+  
+  
+  
+ # phylo_table = rbind(phylo_table,fasta_tree)
+  
+  } else {
+
+  write.csv(x="No new genes", file=paste(folders[j], "/", tools::file_path_sans_ext(basename(fasta_files[j])), "_Out.csv", sep=""), row.names=FALSE)  
+  
+}
+  
+  
+  }
+
+
+#phylo_table$seq.name = interaction(">", phylo_table$seq.name, sep = "")
+ 
+ #  write.table(phylo_table, paste("C:/Users/kileegza/Documents/HMMER/Arabidopsis_ecotypes/tree.FASTA", sep=""), sep = "\n", quote=FALSE, row.names=FALSE, col.names = FALSE)
+   
+   
+#test stuff
+
+#lrrget = grep("LRR", name[1], fixed = TRUE)
+
+#out = read_tblout(name[1])
+
+
+#thing = lapply(output_list, 'length<-', max(lengths(output_list)))
+#thingy = do.call(cbind, thing)
+
+
+
+
+
+
+```
+
+##Take lists from HMMER analysis in previous chunk, parse them for the gene sequences, and output this. 
+```{r}
+
+library(phylotools)
+library(dplyr)
+
+
+
+#directory = "C:/Users/kileegza/Documents/HMMER/Fastas/Athal"    --> set directory here if needed, but should be done already in previous chunk
+
+directory = "C:/Users/kileegza/Documents/HMMER/HMMSEARCH_Outputs/Jan_2021_26_Ecotype_LRR"  #Set directory variable for further usage in chunks
+  
+#get folder list to iterate over  
+folders = list.dirs(directory, recursive = FALSE, full.names = TRUE)
+
+#get list of fasta files used
+fasta_files = list.files("C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/Cleaned_Sep_2020", pattern=".fasta", full.names=TRUE)
+
+
+
+###################if coming from HMMParsing chunk, ignore the above code and go straight here #######################
+
+Ecotypes = folders
+
+Ecotype_CSVs = list.files(directory, pattern="*.csv", full.names=TRUE, recursive=TRUE)
+
+for (i in 1:length(fasta_files)){
+  
+  print(paste("Outputting ", basename(Ecotypes[i]), sep=""))
+  #import fasta files. fasta_files variable was assigned in the previous chunk
+  fasta_prot = as.data.frame(read.fasta(fasta_files[i])) 
+  
+  domains = read.csv(Ecotype_CSVs[i])
+  
+  things = fasta_prot %>% filter(seq.name %in% domains$potential_LRRRLPs)
+  
+  things$seq.name = paste(">", things$seq.name, sep="")
+  
+  write.table(things, paste("C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/Dec_2020_RLP_Only/", basename(Ecotypes[i]), "_RLPs_only_prot.fasta", sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+  
+}
+
+
+
+```
+
+
+
+##Similar to previous chunk, but instead does work on the 7 short-read long-read ecotypes (the one from that paper)
+```{r}
+
+library(phylotools)
+library(dplyr)
+library(stringr)
+
+
+#directory = "C:/Users/kileegza/Documents/HMMER/Fastas/Athal"    --> set directory here if needed, but should be done already in previous chunk
+Ecotypes_CSVs = list.files("C:/Users/kileegza/Documents/HMMER/HMMSEARCH_Outputs/Jan_2021_26_Ecotype_LRR", pattern="*.csv$", full.names=TRUE, recursive=TRUE)
+
+fasta_files = list.files("C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/Cleaned_Sep_2020", full.names=TRUE, recursive=FALSE)
+
+#directory = "C:/Users/kileegza/Documents/HMMER/HMMSEARCH_Outputs/2020_09_15_28_Ecotype_ATHAL"   #Set directory variable for further usage in chunks
+  
+#get folder list to iterate over  
+folders = list.dirs(directory, recursive = FALSE, full.names = TRUE)
+
+#get list of fasta files used
+
+
+
+#This loop here is for if you have separate CSV files
+for (i in 1:length(fasta_files)){
+  
+  print(paste("Outputting ", basename(Ecotypes_CSVs[i]), sep=""))
+  #import fasta files. fasta_files variable was assigned in the previous chunk
+  fasta_prot = as.data.frame(read.fasta(fasta_files[i])) 
+  fasta_prot$seq.name = str_replace(fasta_prot$seq.name, "^.*_","")
+  
+  domains = read.csv(Ecotypes_CSVs[i])
+  
+  
+  #filter_kinases_NLRs = as.data.frame(c(domains$NB.ARC, domains$pkise_only))
+  #colnames(filter_kinases_NLRs) = "NLR_Kinases"
+  
+ 
+  
+  #Remove NLRs (elemnts that appear in first column only)
+  #filtered_LRRs = domains %>% filter(!LRRs %in% domains$pkise_only & !LRRs %in% domains$NB.ARC)
+  filtered_kinases = domains %>% filter(!pkise_only %in% domains$NB.ARC)
+  
+  
+  things = fasta_prot %>% filter(seq.name %in% filtered_kinases$pkise_only)
+  
+  test = domains %>% filter(NB.ARC %in% domains$pkise_only)
+  
+ # things$seq.name = paste(">", things$seq.name, sep="")
+  
+  
+  
+  if (nrow(things) !=0){
+    
+    if (length(grep(pattern="-",x=things[1,1]))>0){
+      
+       things$seq.name = paste(">", things$seq.name, sep="")
+      
+    
+      
+  #Add '>' to the front of sequence names to match fasta format
+  
+    
+  } else {
+    
+      things$seq.name = paste(">", str_extract(basename(fasta_files[i]),"^([^_]*)"), "_", things$seq.name, sep="")
+    #things$seq.name = paste(">", things$seq.name, sep="")
+         
+  
+    }
+    
+  } 
+  
+  write.table(things, paste("C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/Jan_2021_26Ecotype_Pkinases/", str_extract(basename(fasta_files[i]), "^([^_]*)"), "_pkinases_for_Filtering.fasta", sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+  
+}
+
+
+
+#Read csv containing a single csv file with all gene/protein names in it
+Ecotype_CSV = read.csv("C:/Users/kileegza/Documents/Short_Term_Excel_files/Conservative_LRR_RLP_Sequence_Names.csv")
+
+
+#get a list of the fastafiles to be used to extract sequences
+fasta_files = list.files("C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/Cleaned_Sep_2020", pattern="*.fasta", recursive=FALSE, full.names=TRUE)
+
+#This loop here is if you have one csv file with the genes in it
+
+for (i in 1:length(fasta_files)){
+  
+  #tell user which file being worked on
+  print(paste("Outputting ", str_extract(basename(fasta_files[i]), "^([^_]*)"), sep=""))
+  
+  #import fasta file as a data frame. 
+  fasta_prot = as.data.frame(read.fasta(fasta_files[i])) 
+  
+  
+  #Holding variable things uses dplyr to find sequences in the ecotype fasta file found in the ecotype csv
+  things = fasta_prot %>% filter(seq.name %in% Ecotype_CSV[,i])
+  
+  #Add '>' to the front of sequence names to match fasta format
+  things$seq.name = paste(">", things$seq.name, sep="")
+  
+  #write the sequence to fasta file. 
+  write.table(things, paste("C:/Users/kileegza/Documents/HMMER/Fastas/Cleaned/Jan_2021_RLPs/", str_extract(basename(fasta_files[i]), "^([^_]*)"), "_Ecotype_RLP_Conservative.fasta", sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+  
+}
+
+
+```
+
+
+##get sequences for tree building
+```{r}
+#Make sure to use read.fasta from package phylotools - DNAbin will not work with this
+
+clean = read.fasta("C:/Users/kileegza/Documents/HMMER/Fastas/Athal/Col_0_prot_cleanname.fasta")
+thing = matrix(clean[,1])
+
+blargh = clean[regex]
+
+blargh = filter(clean, seq.name == regex("AT[0-9].*\\.1"))
+
+heh = str_extract(clean$seq.name, "AT[0-9].*\\.1")
+heh = sort(heh)
+
+atone = clean[clean$seq.name %in% heh,]
+  fasta_tree = fasta_stuff[fasta_stuff$seq.name %in% pkinase_intersect,]
+  
+  atone$seq.name = interaction(">", atone$seq.name, sep="")
+  
+  write.table(atone, "C:/Users/kileegza/Documents/HMMER/Fastas/Athal/Col_0_representative.fasta", quote = FALSE, col.names = FALSE, row.names  = FALSE, sep = "\n" )
+
+
+```
+
+
+##HMMScan deconvulation 
+```{r}
+
+library(rhmmer)
+hmmeroutput = read_domtblout("C:/Users/kileegza/Documents/HMMER/HMMSCAN_Outputs/Arath_LRRs/Col_LRRRLK_Protein.fasta.txt")
+hmmtbl = cbind(hmmeroutput[,1:4], hmmeroutput[,5:6], hmmeroutput[,20:21])
+               
+
+unique_genes = unique(hmmeroutput$query_name)
+
+lrr_list= vector(mode="list", length=length(unique_genes))
+names(lrr_list) = unique(unique_genes)
+
+for (i in 1:length(lrr_list)){
+  
+  temp = hmmtbl %>% filter(query_name%in% unique_genes[i])
+  
+  lrr_list[[i]] = temp[order(temp$env_from, decreasing=FALSE),]
+  
+  
+}
+
+test = hmmtbl %>% filter(query_name %in% unique_genes[i])
+
+
+
+
+tbl1 = matrix(data=)
+
+
+```
+
+
+###Find overlap between PhytoLRR and kinases and condense duplicates
+```{r}
+
+library(phylotools)
+library(dplyr)
+library(stringr)
+library(rhmmer)
+
+
+#testin = read.delim("C:/Users/kileegza/Documents/Phyto_LRR/Test.txt", sep=",", header=FALSE)
+#testlist = as.list(testin)
+#lrrtest = testin %>% distinct(V2, .keep_all=TRUE)
+
+
+
+
+fasta_list = list.files("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/Apr12_Phytozome/Phytozome/5_Letter_Code_Annotated", pattern="*.fa", full.names=TRUE, recursive=FALSE)
+
+fasta_files_directory = "C:/Users/kileegza/Documents/HMMER/Fastas/Phytozome/Sequence_names_converted_5letter_codes"
+
+phytolrr_LRRs = list.files("D:/Sequence_Data/Phylogenetics_Project/PhytoLRR_Output/PhytoLRR_Output_Parsed/", pattern=".txt", full.names=TRUE)
+outdir=""
+
+hmmsearch_directories=list.dirs("D:/Sequence_Data/Phylogenetics_Project/HMMSearch/HMMSearch_Out/", recursive=FALSE)
+
+LRR_Stats = matrix(ncol=2, nrow=length(phytolrr_LRRs))
+
+sequence_name_key = read.table("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/Apr12_Phytozome/Phytozome/5_Letter_Code_Annotated/Apr12_2021_Phytozome_Key.txt")
+
+#loop over the outputs of HMMSearch
+for (i in 1:length(hmmsearch_directories)){
+  
+  print(paste("Outputting...", str_extract(basename(fasta_list[i]), "^([^_]*)"), sep=""))
+  #read in the hmmsearch output
+  hmm_file = list.files(hmmsearch_directories[i], "*Pkinase.hmm*", full.names=TRUE)
+  tyr_hmm = list.files(hmmsearch_directories[i], "*Tyr.hmm*", full.names=TRUE)
+  pkinases = read_tblout(hmm_file)
+  tyrkinases = read_tblout(tyr_hmm)
+  
+  extra_tyr = tyrkinases %>% filter(!(domain_name %in% pkinases$domain_name))
+  
+  kinases = rbind(pkinases, extra_tyr)
+  
+  #read in the phytoLRR output information
+  input_lrrs = read.delim(phytolrr_LRRs[i], sep=",", header=FALSE)
+  
+  #get the 5 letter code key for name row parsing
+ # name_key = gsub("_.*", "", input_lrrs[1,1])
+  name_key = sequence_name_key[i,1]
+  name_vec=grep(name_key, input_lrrs$V1)    #parse name row and figure out which ones contain the name key
+
+
+
+#Initialize list to contain LRR output
+blahlist = vector(mode="list", length=length(name_vec))
+#loop over the number of genes with at least one LRR up to just before the last one
+for (j in 1:(length(name_vec)-1)){
+ #Want to get values in between the name containing rows of the matrix. 
+  temp = input_lrrs[(name_vec[j]+1):(name_vec[j+1]-1),]
+  
+  if (nrow(temp) > 1){
+    
+    tempfiltered = temp %>% filter(V3 >= 10)
+    
+    if (nrow (tempfiltered) > 1){
+      blahlist[[j]] = tempfiltered
+    }
+  }
+  
+  names(blahlist)[j] = input_lrrs[name_vec[j],1]
+  
+}
+
+#add on last element to list.
+blahlist[[length(name_vec)]] = input_lrrs[(name_vec[length(name_vec)]+1):nrow(input_lrrs),]
+names(blahlist)[length(name_vec)] = input_lrrs[name_vec[length(name_vec)],1]
+
+#remove empty elements from list
+#blahlist[sapply(blahlist, nrow)>0] = NULL
+
+#names = names(blahlist)      #get names for further manipulation, such as LRR counting
+
+testlist = blahlist[kinases$domain_name]
+testlist[sapply(testlist, is.null)] = NULL
+
+names = names(testlist)
+
+#write.table()
+#input$V1 = gsub("\\.[0-9]+", "", input$V1, perl=TRUE)
+
+#unique = unique(input$V3)
+
+#find unique value and collapse duplicate values into one row
+#LRRs_duplicates_collapsed = input %>% distinct(V3, .keep_all=TRUE)
+#filtered_LRRs = LRRs_duplicates_collapsed %>% filter()
+
+
+#assign information to stats matrix
+LRR_Stats[i,1] = str_extract(basename(fasta_list[i]), "^([^_]*)")
+LRR_Stats[i,2] = length(names)
+
+#Fasta writing portion
+##############################################################
+  if (length(names)>0){
+#read fasta into memory
+    fasta_file = as.data.frame(read.fasta(fasta_list[i]))
+
+#remove everything in header but sequence name
+   fasta_file$seq.name = gsub(" pacid.*", "",fasta_file$seq.name )
+
+
+#Holding variable things uses dplyr to find sequences in the ecotype fasta file found in the ecotype csv
+   things = fasta_file %>% filter(seq.name %in% names)
+  
+  #Add '>' to the front of sequence names to match fasta format
+   things$seq.name = paste(">", things$seq.name, sep="")
+  
+  } else {
+  things = ""
+  }
+  
+ #write the sequence to fasta file. 
+  write.table(things, paste("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/Apr12_Phytozome/LRR_Only_Primary_Transcript/", str_extract(basename(fasta_list[i]), "^([^_]*)"), "_LRRs_primary_transcript.fasta", sep=""), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+
+
+}
+
+colnames(LRR_Stats) = c("Species Name", "LRR Count")
+write.csv(LRR_Stats,"D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/Mar30_2021_Phytozome_Primary_Transcripts/LRR_Only/LRR_Stats_Species.csv", row.names=FALSE)
+
+```
+
+#take input CSV of genes and break into group counts
+```{r}
+
+library(stringr)
+
+csv_in = read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/Predict_PhytoLRR/Apr6_Phytozome_LRR_Groups.csv")
+
+input = list.files("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/Mar30_2021_Phytozome_Primary_Transcripts/LRR_Only", pattern="*.fasta", recursive=FALSE)
+
+#total = data.frame(newcol=c(t(csv_in)), stringsAsFactors = FALSE)
+keynames=gsub("_.*", "", input)
+
+#do this if you don't have the key made yet
+key = substr(input, 1,5)
+
+
+key = read.table("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/Mar30_2021_Phytozome_Primary_Transcripts/Phytozome_5LetterCode_Key.txt")
+realkey = key[,2]
+
+LRR_Count_Matrix = matrix(ncol=ncol(csv_in), nrow=length(realkey))
+rownames(LRR_Count_Matrix) = realkey
+colnames(LRR_Count_Matrix) = colnames(csv_in)
+
+for (i in 1:length(realkey)){
+  for (j in 1:ncol(csv_in)){
+    
+    LRR_Count_Matrix[i,j] = length(grep(realkey[i], csv_in[,j]))
+    
+  }
+}
+
+
+output_key = t(rbind(keynames, key))
+
+write.table(output_key, "D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/Mar30_2021_Phytozome_Primary_Transcripts/Phytozome_5LetterCode_Key.txt", quote=FALSE, row.names=FALSE, col.names=FALSE, sep = "\t")
+
+
+write.csv(LRR_Count_Matrix, "D:/Sequence_Data/Phylogenetics_Project/Clustering/Predict_PhytoLRR/Apr6_2021_Species_LRR_Family_Counts.csv", row.names=TRUE, col.names=TRUE)
+
+
+
+
+```
+
+
+```{r}
+
+library(phylotools)
+library(dplyr)
+
+#lrr_sequences=list.files("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/Mar30_2021_Phytozome_Primary_Transcripts/LRR_Only", pattern="*.fasta", recursive = FALSE)
+
+lrr_sequence_file = read.fasta("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/Mar30_2021_Phytozome_Primary_Transcripts/2021_July9th_LRR_Only_Concatenated.fasta")
+
+#For cds
+lrr_sequence_file = read.fasta("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/2021_July15th_CDS/20210713_phytozome_CDSPrimaryTranscriptOnly/ID_Cleaned/2021_July15_CDS_113Species_Concatenated.fasta")
+
+
+
+#lrrkinase_sequence_file = read.fasta("D:/Sequence_Data/Phylogenetics_Project/Input_FASTAs/2021_Apr6_Kinase_files/2021_July9th_LRRs_KinaseOnly_111Species.fasta")
+
+familygroups=as.data.frame(read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/Predict_PhytoLRR/Apr6_Phytozome_LRR_Groups.csv"))
+
+
+
+
+for(i in 1:ncol(familygroups)){
+  
+  print(c("Outputting",colnames(familygroups[i])))
+  
+  thing = str_remove(familygroups[[i]], ".p$")
+  
+  #Familygroups_if using CDS. Need to remove the .p from family groups to proceed for CDS, which don't have the .p"
+  output_sequences = lrr_Sequence_file %>% filter(seq.name %in% str_remove(familygroups[[i]], "\\.p$") )
+  
+  
+  #output_sequences = lrr_Sequence_file %>% filter(seq.name %in% familygroups[[i]] )
+  #output_sequences = lrrkinase_sequence_file %>% filter(seq.name %in% familygroups[[i]])
+  #output_sequences_test = familygroups %>% filter(!(I.1 %in% output_sequences$seq.name))
+  
+  output_sequences$seq.name = paste(">", output_sequences$seq.name, sep="")
+  
+  #For kinases
+  #write.table(output_sequences, paste("D:/Sequence_Data/Phylogenetics_Project/Family_Subclades/Kinases/2021_July10_", colnames(familygroups[i]), "_113Species_Kinase_LRRs.fasta", sep=""), quote=FALSE, row.names=FALSE, col.names=FALSE, sep="\n")
+  
+  #For full length proteins
+  #write.table(output_sequences, paste("D:/Sequence_Data/Phylogenetics_Project/Family_Subclades/Full_length/2021_May11_", colnames(familygroups[i]), "_113Species_Full_Length_LRRs.fasta", sep=""), quote=FALSE, row.names=FALSE, col.names=FALSE, sep="\n")
+  
+  #For cds
+  write.table(output_sequences, paste("D:/Sequence_Data/Phylogenetics_Project/Family_Subclades/CDS/2021_July15_", colnames(familygroups[i]), "_113Species_Full_Length_LRRs.fasta", sep=""), quote=FALSE, row.names=FALSE, col.names=FALSE, sep="\n")
+  
+}
+
+
+```
+
+
+
+```{r}
+library(dplyr)
+library(phylotools)
+library(stringr)
+
+#for full length input
+#input_fasta_to_split = read.fasta("D:/Sequence_Data/Phylogenetics_Project/Family_Subclades/Full_length/2021_July11_I.1_113Species_Full_Length_LRRs.fasta")
+#for kinase input
+input_fasta_to_split = read.fasta("D:/Sequence_Data/Phylogenetics_Project/Family_Subclades/Kinases/2021_July10_I.1_113Species_Kinase_LRRs.fasta")
+#for_CDS_Split
+input_fasta_to_split = read.fasta("D:/Sequence_Data/Phylogenetics_Project/Family_Subclades/CDS/2021_July15_I.1_113Species_Full_Length_LRRs.fasta")
+
+
+input_fasta_to_split$code = str_extract(input_fasta_to_split$seq.name, "^*([^_]*)")
+
+five_letter_code = unique(str_extract(input_fasta_to_split$seq.name, "^*([^_]*)"))
+
+for (i in 1:length(five_letter_code)){
+  
+  species_output = input_fasta_to_split %>% filter(code %in% five_letter_code[i])
+  species_output = species_output[,1:2]
+  species_output$seq.name = paste(">", species_output$seq.name, sep="")
+  
+  #output for full length
+  #write.table(species_output, paste("D:/Sequence_Data/Phylogenetics_Project/Orthofinder/FASTAs/Full_Length_LRRs/", five_letter_code[i], "_Full_Length_LRRs.fasta", sep=""), quote=FALSE, row.names=FALSE, col.names=FALSE, sep="\n")
+  
+  #output for kinase only
+  #write.table(species_output, paste("D:/Sequence_Data/Phylogenetics_Project/Orthofinder/FASTAs/LRR_kinase/", five_letter_code[i], "_I.1_Kinase_LRRs.fasta", sep=""), quote=FALSE, row.names=FALSE, col.names=FALSE, sep="\n")
+  
+  #output for CDS
+  write.table(species_output, paste("D:/Sequence_Data/Phylogenetics_Project/Family_Subclades/CDS/LRR_I.1/", five_letter_code[i], "_I.1_CDS_LRRs.fasta", sep=""), quote=FALSE, row.names=FALSE, col.names=FALSE, sep="\n")
+  
+}
+
+
+```
+
+
+###Split subclades
+```{r}
+library(dplyr)
+library(phylotools)
+
+input_fasta = read.fasta("D:/Sequence_Data/Phylogenetics_Project/Family_Subclades/Full_length/2021_July11_I.1_113Species_Full_Length_LRRs.fasta")
+clades = read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/LRR_Families/LRRI_Subclades.csv")
+
+for (i in 1:ncol(clades)){
+  
+  temp_clade = input_fasta %>% filter(seq.name %in% clades[[i]])
+  temp_clade$seq.name = paste(">", temp_clade$seq.name, sep="")
+  
+  write.table(temp_clade, paste("D:/Sequence_Data/Phylogenetics_Project/Family_Subclades/Full_length/LRRI_Subclades/2021_July29_", colnames(clades[i]), ".fasta", sep=""), quote=FALSE, row.names=FALSE, col.names=FALSE, sep="\n")
+}
+
+```
+
+
+###Split HMMScan subclades
+
+```{r}
+
+
+library(dplyr)
+library(phylotools)
+
+library(rhmmer)
+
+clades = read.csv("D:/Sequence_Data/Phylogenetics_Project/Clustering/LRR_Families/LRRI_Subclades.csv")
+hmmeroutput = read_domtblout("D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/2021_Aug3_LRRI_HMMScan_Output.txt")
+hmmtbl = cbind(hmmeroutput[,1:4], hmmeroutput[,5:6], hmmeroutput[,20:21])
+               
+
+unique_genes = unique(hmmeroutput$query_name)
+
+lrr_list= vector(mode="list", length=length(unique_genes))
+names(lrr_list) = unique(unique_genes)
+
+
+#Filters by kinase domain and exports everything that is not downstream of the kinase domain
+separate=TRUE
+
+
+#Filter and export domains by LRRI subclade
+
+for (i in 1:ncol(clades)){
+  
+  temp_clade = hmmtbl %>% filter(query_name %in% clades[[i]])
+  colnames(temp_clade) = colnames(hmmtbl)
+ 
+  
+  write.table(temp_clade, paste("D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/2021_Aug3_", colnames(clades[i]), "HMMScan.txt", sep=""), quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
+}
+
+#If option separate is true, run this loop
+if (separate==TRUE){
+  
+  #loop over the number of clades and export extracellular domain sequences only
+  for (i in 1:ncol(clades)){
+  
+    
+  print(c("Working on ", colnames(clades[i])))
+    
+    #Filter hmmtbl input for kinase domains
+   temp_clade = hmmtbl %>% filter((query_name %in% clades[[i]]) & (domain_name == "Pkinase" | domain_name == "Pkinase_fungal") & (env_from > 100)) 
+   temp_clade = temp_clade[!duplicated(temp_clade$query_name),]     #remove duplicated entires to maintain first occurrence of kinase domain
+   
+   temp_fasta = input_fasta %>% filter(seq.name %in% clades[[i]])        #filter input fasta for only clade sequences
+   
+   temp_fasta$seq.text = substring(temp_fasta$seq.text, 1, temp_clade$env_from)     #Subset protein sequence for everything before kinase domain
+   temp_fasta$seq.name = paste(">", temp_fasta$seq.name, sep="")
+   
+   
+   
+   #temp_clade = hmmtbl %>% filter(domain_name == "Pkinase")
+    #colnames(temp_clade) = colnames(hmmtbl)
+ 
+  
+    write.table(temp_fasta, paste("D:/Sequence_Data/Phylogenetics_Project/Family_Subclades/ECD/2021_Aug11_", colnames(clades[i]), "_LRR_ECD.fasta", sep=""), quote=FALSE, row.names=FALSE, col.names=FALSE, sep="\n")
+  }
+}
+
+
+
+
+for (i in 1:length(lrr_list)){
+  
+  temp = hmmtbl %>% filter(query_name%in% unique_genes[i])
+  
+  lrr_list[[i]] = temp[order(temp$env_from, decreasing=FALSE),]
+  
+  
+}
+
+test = hmmtbl %>% filter(query_name %in% unique_genes[i])
+
+
+
+
+tbl1 = matrix(data=)
+
+
+```
+
+
+###Split input sequences by a particular HMM hit, in this case kinase
+
+```{r}
+
+library(rhmmer)
+library(stringr)
+library(phylotools)
+library(dplyr)
+
+
+directory = "D:/Analysis_Output/Orthogroup_Assignment/Sep2024/Kinases/Orthofinder_out/Results_Dec9/RLKs_Only/Consensus/Aligned/"
+fasta_file = "RLKs_consensus_combined.fasta"
+hmm_dir = paste(directory, fasta_file, "_dir/", sep="")
+
+
+pkinase_hmmer = read_domtblout(paste(hmm_dir, fasta_file, "_Pkinase.hmm.out.txt", sep=""))
+pkinase_hmmer$domain_name = gsub("^.*\\|", "", pkinase_hmmer$domain_name)
+#pkinase_hmmer$domain_name = gsub("Lsati_Lesat", "Lsatv_Lesat", pkinase_hmmer$domain_name)
+#pkinase_hmmer = pkinase_hmmer %>% filter(domain_name == "Pkinase")
+
+
+pkinaseTyr_hmmer = read_domtblout(paste(hmm_dir, fasta_file,"_Pkinase_Tyr.hmm.out.txt", sep=""))
+pkinaseTyr_hmmer$domain_name = gsub("^.*\\|", "", pkinaseTyr_hmmer$domain_name)
+#pkinaseTyr_hmmer$domain_name = gsub("Lsati_Lesat", "Lsatv_Lesat", pkinaseTyr_hmmer$domain_name)
+
+#input_list = read.csv("D:/Sequence_Data/Phylogenetics_Project/LRRVIII.2_List.csv")
+#input_list = sort(input_list$LRRVIII.2)
+
+#input_fasta = read.fasta("D:/Sequence_Data/Phylogenetics_Project/Domains_Output_HMMSCAN/LRK10Ls/2022_Aug_predictedLRK10Ls_24Species_FullLength.fasta")
+
+input_fasta = read.fasta(paste(directory, fasta_file, sep=""))
+#thing = grep()
+
+#input_fasta$seq.name = gsub(" ", "", input_fasta$seq.name)  #fixing input names....
+#input_fasta$seq.name = gsub("Lsati_Lesat", "Lsatv_Lesat", input_fasta$seq.name)  #fixing input names....
+
+#pkinase_hmmer = pkinase_hmmer %>% filter(domain_name %in% input_list)
+#pkinase_hmmerTyr = pkinaseTyr_hmmer %>% filter(domain_name %in% input_list)
+#pkinase_total = pkinase_hmmer %>% filter(domain_accession %in% pkinaseTyr_hmmer$domain_accession)
+pkinase_diff = pkinaseTyr_hmmer %>% filter(!(domain_name %in% pkinase_hmmer$domain_name))
+
+pkinase_total = rbind(pkinase_hmmer, pkinase_diff)
+
+#fastas = input_fasta %>% filter(seq.name %in% as.vector(input_list))
+#row.names(fastas) = fastas$seq.name
+
+unique_pkinase_names = unique(pkinase_hmmer$domain_name)
+
+multi_copy = unique(pkinase_hmmer$domain_name[duplicated(pkinase_hmmer$domain_name)])
+
+#kinase_fasta = input_fasta %>% filter(seq.name %in% as.vector(unique_pkinase_names))
+#kinase_fasta = input_fasta %>% filter(seq.name %in% as.vector(unique(pkinase_hmmer$query_name)))
+#temp_hmmer_hits = pkinase_hmmer %>% filter(query_name %in% as.vector(unique(temp_fasta$seq.name)))
+
+ecd_fasta = kinase_fasta
+
+
+#for (i in 1:nrow(temp_fasta)){
+  
+#  intermediate_hmmer_hits = pkinase_hmmer %>% filter(query_name %in% temp_fasta[i,1])
+  #first_hit = rbind(first_hit, intermediate_hmmer_hits[1,])
+  
+  
+  
+ # temp_fasta[i,2] = substring(temp_fasta[i,2], min(intermediate_hmmer_hits[,20]), nchar(temp_fasta[i,2]))
+  
+  #temp_fasta[i,2] = substring(temp_fasta[i,2], min(intermediate_hmmer_hits[,20]), nchar(temp_fasta[i,2]))
+ # temp_fasta[i,2] = substring(temp_fasta[i,2], 1, min(intermediate_hmmer_hits[,20]))
+  
+  
+#}
+
+#filtered_fasta = temp_fasta %>% filter(nchar(seq.text) >=100)
+
+#problem_children = as.data.frame(input_list) %>% filter(!(v1 %in% fastas$seq.name))
+
+
+
+#first_hit = data.frame()
+#for (i in 1:length(input_list)){
+  
+ # print(i)
+  
+#  intermediate_hmmer_hits = pkinase_hmmer_LRR %>% filter(domain_name %in% input_list[i])
+  #first_hit = rbind(first_hit, intermediate_hmmer_hits[1,])
+  
+ # fastas[as.character(intermediate_hmmer_hits[1,1]),2] = substring(fastas[i,2], intermediate_hmmer_hits[1,20], nchar(fastas[i,2]))
+#}
+
+#filtered_fasta = temp_fasta %>% filter(nchar(seq.text) > 50)
+
+
+#filtered_fasta$seq.name = paste(">", filtered_fasta$seq.name, sep="")
+
+
+
+
+
+
+#alternate filtering method
+
+kinase_fasta = input_fasta
+ecd_fasta = input_fasta
+
+for (j in 1:nrow(input_fasta)){
+  
+  filtered_hmmer = pkinase_hmmer %>% filter(domain_name == input_fasta$seq.name[j])
+  
+  if (dim(filtered_hmmer)[1] ==0){
+    
+    filtered_hmmer = pkinaseTyr_hmmer %>% filter(domain_name == input_fasta$seq.name[j])
+    
+  }
+  
+  print(j)
+  kinase_fasta[j,2] = substring(temp_fasta[j,2], min(filtered_hmmer[,20]), nchar(temp_fasta[j,2]))
+  ecd_fasta[j2,] = substring(temp_fasta[j,2], 1, min(filtered_hmmer[,20]))
+  
+}
+
+filtered_kd = kinase_fasta %>% filter(nchar(seq.text) > 10)
+filtered_ecd = ecd_fasta %>% filter(nchar(seq.text) > 10)
+
+filtered_kd$seq.name = paste(">", filtered_fasta$seq.name, sep="")
+filtered_ecd$seq.name = paste(">", filtered_fasta$seq.name, sep="")
+
+#write.table(filtered_kd, paste(directory, fasta_file, "_kinase_only.fasta"), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+write.table(filtered_ecd, paste(directory, fasta_file, "_ECD_only.fasta"), col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+
+#write.table(filtered_fasta, "D:/Sequence_Data/Phylogenetics_Project/LRK10Ls/2022_Aug31_LRK10Ls_24Species_ECD.fasta", col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\n")
+
+```
+
+
+###Get hmmer input then consolidate it into table for total hits
+```{r}
+library(rhmmer)
+library(stringr)
+library(phylotools)
+library(dplyr)
+
+
+sequence_names = read.table("D:/Sequence_Data/Phylogenetics_Project/2023_September_FinalFilesForPaper/2023_Sep19_LRRI.1_Proteins.names.txt")
+colnames(sequence_names) = "Sequence_names"
+
+input_hmmer_directory ="D:/Sequence_Data/Phylogenetics_Project/HMMSearch/HMMSearch_Out/Parsed/" 
+files_in = list.files(input_hmmer_directory, pattern="2023*")
+
+domain_names = gsub("2023_112Species_Combined_","",files_in)
+domain_names = gsub(".txt","",domain_names)
+
+
+domain_hit_df = data.frame(Sequence_name=sequence_names)
+
+
+for (i in 1:length(domain_names)){
+  
+  domain_hits = read.table(paste(input_hmmer_directory, files_in[i], sep=""))
+  domain_hits = cbind(domain_hits,c(domain_names[i]))
+  colnames(domain_hits) = c("Sequence_names",domain_names[i])
+
+  
+    domain_hit_df = left_join(domain_hit_df, domain_hits)
+  
+    
+
+}
+
+write.csv(domain_hit_df, "D:/Sequence_Data/Phylogenetics_Project/2023_September_FinalFilesForPaper/2023_DomainHits_Table.csv")
+
+
+```
+
+
